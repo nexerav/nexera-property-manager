@@ -5,8 +5,7 @@
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Tests](https://github.com/nexerav/nexera-property-manager/actions/workflows/test.yml/badge.svg)](https://github.com/nexerav/nexera-property-manager/actions/workflows/test.yml)
 
-[Website](https://www.nexerav.com) · [Report a bug](https://github.com/nexerav/nexera-property-manager/issues)
-<!-- PLACEHOLDER: add "[Live demo](https://demo.nexerav.com) · " before Website once the demo is live -->
+[Live demo](https://demo.nexerav.com) · [Website](https://www.nexerav.com) · [Report a bug](https://github.com/nexerav/nexera-property-manager/issues)
 
 <!-- PLACEHOLDER: 20–30 s GIF, docs/screenshots/tour.gif: sign in → add rent → create invoice → download PDF. Sample data only. -->
 <!-- ![Tour](docs/screenshots/tour.gif) -->
