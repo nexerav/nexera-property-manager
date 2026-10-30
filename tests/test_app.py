@@ -3,6 +3,8 @@ import io
 import json
 import os
 import re
+import subprocess
+import sys
 import tempfile
 import unittest
 import zlib
@@ -11,9 +13,10 @@ from datetime import datetime as RealDateTime
 TEMP_DIR = tempfile.mkdtemp()
 DATA_FILE = os.path.join(TEMP_DIR, "rental_data.json")
 os.environ["DATA_FILE"] = DATA_FILE
-os.environ["SECRET_KEY"] = "test-secret"
+os.environ["SECRET_KEY"] = "unit-test-secret"
 os.environ["APP_USERNAME"] = "admin"
-os.environ["APP_PASSWORD"] = "admin123"
+os.environ["APP_PASSWORD"] = "unit-test-password"
+os.environ.pop("FLASK_DEBUG", None)
 
 import app as pm
 
@@ -44,7 +47,7 @@ class PropertyAppTest(unittest.TestCase):
         self.client = pm.app.test_client()
         response = self.client.post(
             "/login",
-            data={"username": "admin", "password": "admin123"},
+            data={"username": "admin", "password": "unit-test-password"},
             follow_redirects=True,
         )
         self.assertEqual(response.status_code, 200)
@@ -59,6 +62,35 @@ class PropertyAppTest(unittest.TestCase):
         })
         self.assertEqual(response.status_code, 201)
         return response.get_json()
+
+    def test_refuses_missing_or_placeholder_secrets(self):
+        self.assertEqual(pm.VALID_PASSWORD, "unit-test-password")
+        self.assertEqual(pm.app.secret_key, "unit-test-secret")
+        self.assertFalse(pm.debug_requested())
+        blocked = [
+            ("SECRET_KEY", "", "APP_PASSWORD", "unit-test-password"),
+            ("SECRET_KEY", "change-me-in-production-please", "APP_PASSWORD", "unit-test-password"),
+            ("APP_PASSWORD", "", "SECRET_KEY", "unit-test-secret"),
+            ("APP_PASSWORD", "admin123", "SECRET_KEY", "unit-test-secret"),
+        ]
+        root = os.path.dirname(os.path.abspath(pm.__file__))
+        for name, bad, other_name, other_value in blocked:
+            env = os.environ.copy()
+            env["DATA_FILE"] = DATA_FILE
+            env[name] = bad
+            env[other_name] = other_value
+            env.pop("FLASK_DEBUG", None)
+            result = subprocess.run(
+                [sys.executable, "-c", "import app"],
+                cwd=root,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0, msg=result.stderr)
+            self.assertIn(name, result.stderr)
+            if bad:
+                self.assertNotIn(bad, result.stderr)
 
     def test_sign_in_required(self):
         guest = pm.app.test_client()

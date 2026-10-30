@@ -19,15 +19,45 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Published placeholders are rejected so a fresh checkout cannot sign in
+# until the operator chooses both values.
+INSECURE_SECRET_KEYS = frozenset({
+    "dev-secret-change-me",
+    "change-me-in-production-please",
+    "your-secret-key-change-this",
+    "secret",
+    "changeme",
+})
+INSECURE_PASSWORDS = frozenset({
+    "admin123",
+    "password",
+    "changeme",
+})
+
+
+def require_setting(name, value, blocked):
+    cleaned = (value or "").strip()
+    if not cleaned or cleaned.casefold() in blocked:
+        raise SystemExit(
+            f"Refusing to start: set a unique {name} in the environment or .env file. "
+            "This application has no default password or secret key."
+        )
+    return cleaned
+
+
+def debug_requested():
+    return os.environ.get("FLASK_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
+app.secret_key = require_setting("SECRET_KEY", os.environ.get("SECRET_KEY"), INSECURE_SECRET_KEYS)
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 DATA_FILE = os.environ.get("DATA_FILE", os.path.join("data", "rental_data.json"))
 
-VALID_USERNAME = os.environ.get("APP_USERNAME", "admin")
-VALID_PASSWORD = os.environ.get("APP_PASSWORD", "admin123")
+VALID_USERNAME = (os.environ.get("APP_USERNAME") or "admin").strip() or "admin"
+VALID_PASSWORD = require_setting("APP_PASSWORD", os.environ.get("APP_PASSWORD"), INSECURE_PASSWORDS)
 
 PREMIUM_MESSAGE = "Premium feature – contact Nexera Ventures"
 PREMIUM_FEATURES = [
@@ -1278,4 +1308,4 @@ def premium_info():
 if __name__ == "__main__":
     if not os.path.exists(DATA_FILE):
         save_data(load_data())
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "5000")), debug=debug_requested())

@@ -54,18 +54,22 @@ You need [Docker Desktop](https://www.docker.com/products/docker-desktop/) on a 
 ```bash
 git clone https://github.com/nexerav/nexera-property-manager.git
 cd nexera-property-manager
+cp .env.example .env
+```
+
+Open `.env` and set `SECRET_KEY` and `APP_PASSWORD`. The app refuses to start while either value is missing, or while it is still a published placeholder. Generate a secret key with:
+
+```bash
+python3 -c "import secrets; print(secrets.token_hex(32))"
+```
+
+Put that value in `.env`, choose a password, then start:
+
+```bash
 docker compose up -d --build
 ```
 
-Open [http://127.0.0.1:5000](http://127.0.0.1:5000).
-
-The first login is `admin` / `admin123`. Change that before you enter real records:
-
-```bash
-cp .env.example .env
-# Edit SECRET_KEY, APP_USERNAME, and APP_PASSWORD, then:
-docker compose up -d
-```
+Open [http://127.0.0.1:5000](http://127.0.0.1:5000). Sign in with `APP_USERNAME` (`admin`, unless you changed it) and the password you set.
 
 Stop it with `docker compose down`. The `data/` folder is kept.
 
@@ -93,6 +97,8 @@ python3 -m unittest tests.test_app -v
 
 The tests use a temporary data file. They do not read or write `data/rental_data.json`.
 
+GitHub Actions runs these tests and a [gitleaks](https://github.com/gitleaks/gitleaks) scan of the repository history on every push and pull request. Debug mode is off. Set `FLASK_DEBUG=1` only when you start `python app.py` yourself.
+
 ## Layout
 
 ```
@@ -114,7 +120,7 @@ Chart.js 4.4.1 is included under `static/js/chart.umd.min.js` so the dashboard d
 
 ## Security
 
-This is for a computer you control. Do not publish port 5000 to the internet. The JSON file is not encrypted. Change the default password, and keep the `data/` folder private.
+This is for a computer you control. Do not publish port 5000 to the internet. The JSON file is not encrypted. Set your own `SECRET_KEY` and `APP_PASSWORD` before the first start, and keep the `data/` folder private.
 
 See [SECURITY.md](SECURITY.md) for how to report a vulnerability. Do not include tenant names, account numbers, or a copy of your data file.
 

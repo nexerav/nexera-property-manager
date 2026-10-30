@@ -4,7 +4,7 @@
 
 Nexera Property Manager is a local application. One person signs in. The records sit in `data/rental_data.json` as plain text.
 
-- Change `APP_PASSWORD` and `SECRET_KEY` in `.env` before you store real records.
+- Set `APP_PASSWORD` and `SECRET_KEY` in `.env` before the first start. The app exits if either value is missing or still a published placeholder. There is no default password.
 - Do not forward port 5000 to the public internet.
 - Keep the `data/` folder out of shared drives if other people should not read it.
 - The file is not encrypted. A backup is a copy of that file. Protect the copy the same way.
