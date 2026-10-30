@@ -1,0 +1,15 @@
+.env
+data/rental_data.json
+data/logo.png
+data/logo.jpg
+data/logo.jpeg
+data/logo.gif
+data/logo.webp
+__pycache__/
+*.pyc
+.DS_Store
+.venv/
+venv/
+*.log
+.idea/
+.vscode/

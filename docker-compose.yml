@@ -1,0 +1,14 @@
+services:
+  property-manager:
+    build: .
+    container_name: nexera-property-oss
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production-please}
+      - APP_USERNAME=${APP_USERNAME:-admin}
+      - APP_PASSWORD=${APP_PASSWORD:-admin123}
+    restart: unless-stopped

@@ -1,0 +1,21 @@
+name: Change request
+description: A change to the free edition
+title: "[Change] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Paid features (email, WhatsApp, reminders, hosting, OCR, extra users) stay locked in this edition. Describe a change a person can use on their own computer.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is missing or awkward?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What should it do?
+    validations:
+      required: true

@@ -1,0 +1,35 @@
+name: Bug report
+description: Something in the free edition does not work
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include real tenant names, property addresses, phone numbers, bank details, or your data file.
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      description: What you clicked, and whether you used Docker.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: System
+      placeholder: macOS, Docker Desktop
+    validations:
+      required: true

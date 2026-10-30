@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nexera Property Manager</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+    <header>
+        <div class="header-row">
+            <div class="brand">
+                <img id="app-logo" data-logo alt="" hidden data-has-logo="{{ '1' if logo else '' }}">
+                <div>
+                    <strong>Nexera Property Manager</strong>
+                    <div id="org-name" class="org-name" {% if not organisation_name %}hidden{% endif %}>{{ organisation_name }}</div>
+                </div>
+            </div>
+            <a class="logout" href="/logout">Log out</a>
+        </div>
+        <nav class="tabs" aria-label="Sections">
+            <button type="button" class="active" data-tab="overview">Overview</button>
+            <button type="button" data-tab="properties">Properties</button>
+            <button type="button" data-tab="money">Money</button>
+            <button type="button" data-tab="invoices">Invoices</button>
+            <button type="button" data-tab="maintenance">Maintenance<span id="job-count"></span></button>
+            <button type="button" data-tab="settings">Settings</button>
+            <button type="button" class="locked-tab" onclick="showPremium()">Property Pipeline</button>
+            <button type="button" class="locked-tab" onclick="showPremium()">Email</button>
+        </nav>
+    </header>
+    <main class="container">
+        <div id="notice" class="notice" role="status"></div>
+        <div class="toolbar">
+            <div class="field">
+                <label for="period">Period</label>
+                <select id="period">
+                    <option value="month" selected>This month</option>
+                    <option value="year">This year</option>
+                    <option value="all">All time</option>
+                    <option value="custom">Custom dates</option>
+                </select>
+            </div>
+            <div class="field" id="custom-dates" hidden>
+                <label for="period-start">From</label>
+                <input type="date" id="period-start">
+            </div>
+            <div class="field" id="custom-end" hidden>
+                <label for="period-end">To</label>
+                <input type="date" id="period-end">
+            </div>
+            <div class="field grow">
+                <label for="property-filter">Property</label>
+                <select id="property-filter" data-properties data-blank="All properties"></select>
+            </div>
+            <p class="hint" style="flex-basis:100%; margin:0;">The period filters totals and the money list. Maintenance keeps every request for the selected property, so older open jobs stay visible.</p>
+        </div>
+
+        <section data-view="overview">
+            <div class="cards" id="summary-cards">
+                <div class="card"><h3>Loading</h3><div class="value">…</div><div class="hint">Fetching your portfolio.</div></div>
+            </div>
+            <div class="section">
+                <h2>Income and expenses by property</h2>
+                <div class="chart-wrap">
+                    <canvas id="chart"></canvas>
+                </div>
+                <p id="chart-missing" class="empty" hidden></p>
+            </div>
+            <div class="section">
+                <h2>Expenses by category</h2>
+                <div class="table-wrap">
+                    <table id="category-table">
+                        <thead><tr><th>Category</th><th class="num">Amount</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section data-view="properties" hidden>
+            <div class="section">
+                <h2>Add or edit a property</h2>
+                <form id="property-form">
+                    <p class="edit-flag" hidden></p>
+                    <div class="form-grid">
+                        <div class="field"><label for="prop-name">Name</label><input id="prop-name" name="name" required maxlength="120" placeholder="Unit A - 123 Main Street"></div>
+                        <div class="field"><label for="prop-address">Address</label><input id="prop-address" name="address" maxlength="200" placeholder="123 Main Street, City"></div>
+                        <div class="field">
+                            <label for="prop-kind">Type</label>
+                            <select id="prop-kind" name="kind">
+                                <option>Residential</option>
+                                <option>Commercial</option>
+                                <option>Overhead</option>
+                            </select>
+                        </div>
+                        <div class="field"><label for="prop-rent">Expected monthly rent (R)</label><input id="prop-rent" name="monthly_rent" type="number" min="0" step="0.01" placeholder="Optional"></div>
+                        <div class="field grow"><label for="prop-notes">Notes</label><textarea id="prop-notes" name="notes" placeholder="Tenant, lease end, or what this property is for"></textarea></div>
+                    </div>
+                    <div class="actions-row" style="margin-top:0.8rem;">
+                        <button type="submit" data-label="Add property">Add property</button>
+                        <button type="button" class="secondary" id="property-cancel" data-cancel hidden>Cancel</button>
+                    </div>
+                </form>
+            </div>
+            <div class="section">
+                <h2>Portfolio</h2>
+                <p class="hint">Income, expenses, and net use the period selected above. Use Company Expenses for overhead that is not tied to one unit.</p>
+                <div class="table-wrap">
+                    <table id="property-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th><th>Type</th><th>Address</th><th class="num">Monthly rent</th>
+                                <th class="num">Income</th><th class="num">Expenses</th><th class="num">Net</th><th></th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section data-view="money" hidden>
+            <div class="split">
+                <form id="income-form" class="section">
+                    <h2>Income</h2>
+                    <p class="edit-flag" hidden></p>
+                    <div class="form-grid">
+                        <div class="field"><label for="income-property">Property</label><select id="income-property" name="property_id" data-properties required></select></div>
+                        <div class="field"><label for="income-amount">Amount (R)</label><input id="income-amount" name="amount" type="number" min="0" step="0.01" required></div>
+                        <div class="field"><label for="income-date">Date</label><input id="income-date" name="date" type="date" required></div>
+                        <div class="field">
+                            <label for="income-type">Type</label>
+                            <select id="income-type" name="income_type">
+                                <option>Rent</option>
+                                <option>Recovery</option>
+                                <option>Other</option>
+                            </select>
+                        </div>
+                        <div class="field" id="recovery-field" hidden>
+                            <label for="income-recovery">Recovery</label>
+                            <select id="income-recovery" name="recovery_category">
+                                <option value="">Choose</option>
+                                <option>Water</option>
+                                <option>Sewerage</option>
+                                <option>Electricity</option>
+                                <option>Common Property Electricity</option>
+                                <option>Refuse</option>
+                                <option>Municipal Utility Charge</option>
+                                <option>Carport</option>
+                                <option>Other Utility</option>
+                            </select>
+                        </div>
+                        <div class="field"><label for="income-tenant">Tenant</label><input id="income-tenant" name="tenant" maxlength="120" placeholder="Optional"></div>
+                        <div class="field"><label for="income-desc">Description</label><input id="income-desc" name="description" maxlength="500" placeholder="March rent"></div>
+                    </div>
+                    <div class="actions-row" style="margin-top:0.8rem;">
+                        <button type="submit" data-label="Add income">Add income</button>
+                        <button type="button" class="secondary" id="income-cancel" data-cancel hidden>Cancel</button>
+                    </div>
+                </form>
+                <form id="expense-form" class="section">
+                    <h2>Expense</h2>
+                    <p class="edit-flag" hidden></p>
+                    <div class="form-grid">
+                        <div class="field"><label for="expense-property">Property</label><select id="expense-property" name="property_id" data-properties required></select></div>
+                        <div class="field"><label for="expense-amount">Amount (R)</label><input id="expense-amount" name="amount" type="number" min="0" step="0.01" required></div>
+                        <div class="field"><label for="expense-date">Date</label><input id="expense-date" name="date" type="date" required></div>
+                        <div class="field">
+                            <label for="expense-category">Category</label>
+                            <select id="expense-category" name="category">
+                                <option>Utilities</option>
+                                <option>Rates</option>
+                                <option>Refuse</option>
+                                <option>Maintenance</option>
+                                <option>Insurance</option>
+                                <option>Repairs</option>
+                                <option>Managing Agent Fees</option>
+                                <option>Accountant Fees</option>
+                                <option>Consulting Fees</option>
+                                <option>Bond Interest (Tax Deductible)</option>
+                                <option>Bond Capital Payment (Equity - Not Deductible)</option>
+                                <option>Technology &amp; Systems</option>
+                                <option>Travel – Property Operations</option>
+                                <option>Transfer &amp; Bond Registration – Capital Costs</option>
+                                <option>Other Banking Expenses</option>
+                                <option>Other</option>
+                            </select>
+                        </div>
+                        <div class="field"><label for="expense-custom">Or your own category</label><input id="expense-custom" name="category_custom" maxlength="80" placeholder="Leave blank to use the list"></div>
+                        <div class="field"><label for="expense-vendor">Vendor</label><input id="expense-vendor" name="vendor" maxlength="120" placeholder="Optional"></div>
+                        <div class="field"><label for="expense-desc">Description</label><input id="expense-desc" name="description" maxlength="500"></div>
+                    </div>
+                    <div class="actions-row" style="margin-top:0.8rem;">
+                        <button type="submit" data-label="Add expense">Add expense</button>
+                        <button type="button" class="secondary" id="expense-cancel" data-cancel hidden>Cancel</button>
+                    </div>
+                </form>
+            </div>
+            <div class="section">
+                <h2>Records in this period</h2>
+                <div class="table-wrap">
+                    <table id="money-table">
+                        <thead>
+                            <tr><th>Date</th><th>Property</th><th>Type</th><th>Details</th><th class="num">Amount</th><th></th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section data-view="maintenance" hidden>
+            <div class="section">
+                <h2>Log a request</h2>
+                <form id="maint-form">
+                    <p class="edit-flag" hidden></p>
+                    <div class="form-grid">
+                        <div class="field"><label for="maint-property">Property</label><select id="maint-property" name="property_id" data-properties required></select></div>
+                        <div class="field"><label for="maint-date">Date</label><input id="maint-date" name="date" type="date" required></div>
+                        <div class="field">
+                            <label for="maint-issue">Issue</label>
+                            <select id="maint-issue" name="issue_type">
+                                <option>Plumbing</option>
+                                <option>Electrical</option>
+                                <option>Appliance</option>
+                                <option>Structural</option>
+                                <option>Heating/Cooling</option>
+                                <option>Security</option>
+                                <option>Pest control</option>
+                                <option>Garden/Exterior</option>
+                                <option>Other</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="maint-urgency">Urgency</label>
+                            <select id="maint-urgency" name="urgency">
+                                <option>Low</option>
+                                <option selected>Medium</option>
+                                <option>High</option>
+                                <option>Emergency</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="maint-status">Status</label>
+                            <select id="maint-status" name="status">
+                                <option selected>Open</option>
+                                <option>In progress</option>
+                                <option>Done</option>
+                            </select>
+                        </div>
+                        <div class="field"><label for="maint-tenant">Reported by</label><input id="maint-tenant" name="tenant_name" maxlength="120" placeholder="Optional"></div>
+                        <div class="field"><label for="maint-phone">Phone</label><input id="maint-phone" name="contact_phone" maxlength="40" placeholder="Optional"></div>
+                        <div class="field"><label for="maint-cost">Cost (R)</label><input id="maint-cost" name="cost" type="number" min="0" step="0.01" placeholder="Optional"></div>
+                        <div class="field"><label for="maint-vendor">Vendor</label><input id="maint-vendor" name="vendor" maxlength="120" placeholder="Optional"></div>
+                        <div class="field grow"><label for="maint-desc">Description</label><textarea id="maint-desc" name="description" required placeholder="What is wrong, and where?"></textarea></div>
+                        <div class="field grow"><label for="maint-notes">Notes</label><textarea id="maint-notes" name="notes" placeholder="Optional follow-up"></textarea></div>
+                    </div>
+                    <div class="actions-row" style="margin-top:0.8rem;">
+                        <button type="submit" data-label="Log request">Log request</button>
+                        <button type="button" class="secondary" id="maint-cancel" data-cancel hidden>Cancel</button>
+                        <button type="button" class="locked" onclick="showPremium()">Email the contractor</button>
+                    </div>
+                </form>
+            </div>
+            <div class="section">
+                <div class="header-row" style="margin-bottom:0.8rem;">
+                    <h2 style="margin:0;">Requests</h2>
+                    <div class="field">
+                        <label for="status-filter">Status</label>
+                        <select id="status-filter">
+                            <option value="">All</option>
+                            <option>Open</option>
+                            <option>In progress</option>
+                            <option>Done</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table id="maint-table">
+                        <thead>
+                            <tr><th>Date</th><th>Property</th><th>Issue</th><th>Description</th><th>Status</th><th class="num">Cost</th><th></th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section data-view="invoices" hidden>
+            <div class="section">
+                <h2>Create an invoice</h2>
+                <p class="hint">Invoices are stored on this computer. Use View, Download PDF, or Edit on a saved invoice. Sending them by email is locked.</p>
+                <form id="invoice-form">
+                    <p class="edit-flag" hidden></p>
+                    <div class="form-grid">
+                        <div class="field"><label for="invoice-property">Property</label><select id="invoice-property" name="property_id" data-properties required></select></div>
+                        <div class="field"><label for="invoice-tenant">Tenant</label><input id="invoice-tenant" name="tenant" maxlength="120" required></div>
+                        <div class="field"><label for="invoice-date">Invoice date</label><input id="invoice-date" name="date" type="date" required></div>
+                        <div class="field"><label for="invoice-due">Due date</label><input id="invoice-due" name="due_date" type="date"></div>
+                        <div class="field">
+                            <label for="invoice-status">Status</label>
+                            <select id="invoice-status" name="status">
+                                <option>Draft</option>
+                                <option>Issued</option>
+                            </select>
+                        </div>
+                        <div class="field grow"><label for="invoice-notes">Notes</label><textarea id="invoice-notes" name="notes" placeholder="Optional note on the invoice"></textarea></div>
+                    </div>
+                    <datalist id="invoice-item-names">
+                        <option value="Monthly Rent"></option>
+                        <option value="Water"></option>
+                        <option value="Electricity"></option>
+                        <option value="Common Electricity"></option>
+                        <option value="Sewerage"></option>
+                        <option value="Refuse"></option>
+                        <option value="Garden"></option>
+                        <option value="Other"></option>
+                    </datalist>
+                    <div id="invoice-lines"></div>
+                    <div class="actions-row" style="margin-top:0.8rem;">
+                        <button type="button" class="secondary" id="add-invoice-line">Add line</button>
+                        <strong id="invoice-total">R 0.00</strong>
+                    </div>
+                    <div class="actions-row" style="margin-top:0.8rem;">
+                        <button type="submit" data-label="Save invoice">Save invoice</button>
+                        <button type="button" class="secondary" id="invoice-cancel" data-cancel hidden>Cancel</button>
+                        <button type="button" class="locked" onclick="showPremium()">Email invoice</button>
+                    </div>
+                </form>
+            </div>
+            <div class="section">
+                <h2>Invoices</h2>
+                <div class="table-wrap">
+                    <table id="invoice-table">
+                        <thead>
+                            <tr><th>Number</th><th>Date</th><th>Property</th><th>Tenant</th><th>Status</th><th class="num">Total</th><th></th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section data-view="settings" hidden>
+            <div class="section">
+                <h2>Organisation</h2>
+                <p class="hint">These details are printed on invoices and the PDF. The email address is only printed. Sending mail stays locked.</p>
+                <form id="settings-form">
+                    <div class="form-grid">
+                        <div class="field"><label for="organisation-name">Company or trust name</label><input id="organisation-name" name="organisation_name" maxlength="160" autocomplete="organization" placeholder="Example Holdings"></div>
+                        <div class="field"><label for="contact-name">Personal name</label><input id="contact-name" name="contact_name" maxlength="120" autocomplete="name" placeholder="A. Owner"></div>
+                        <div class="field grow"><label for="org-address">Address</label><textarea id="org-address" name="address" maxlength="500" autocomplete="street-address" placeholder="Street, city, postal code"></textarea></div>
+                        <div class="field"><label for="org-phone">Phone</label><input id="org-phone" name="phone" maxlength="40" autocomplete="tel" placeholder="Optional"></div>
+                        <div class="field"><label for="org-email">Email</label><input id="org-email" name="email" maxlength="120" autocomplete="email" placeholder="Printed on the invoice"></div>
+                        <div class="field"><label for="org-registration">Registration or tax number</label><input id="org-registration" name="registration_number" maxlength="80" placeholder="Optional"></div>
+                        <div class="field grow"><label for="org-payment">Payment details</label><textarea id="org-payment" name="payment_details" maxlength="1000" placeholder="Optional. Printed on the invoice, such as the account name and the reference to use."></textarea></div>
+                    </div>
+                    <div class="actions-row" style="margin-top:0.8rem;">
+                        <button type="submit">Save details</button>
+                    </div>
+                </form>
+            </div>
+            <div class="section">
+                <h2>Logo</h2>
+                <p class="hint">PNG, JPEG, GIF, or WebP, under 2 MB. Shown in the header, on the sign-in page, and on invoices.</p>
+                <div class="logo-row">
+                    <img id="settings-logo" data-logo alt="Current logo" hidden data-has-logo="{{ '1' if logo else '' }}">
+                    <label class="file-button">Upload logo
+                        <input id="logo-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+                    </label>
+                    <button type="button" class="secondary" id="logo-remove" {% if not logo %}hidden{% endif %}>Remove logo</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="section premium-foot">
+            <h2>Premium features</h2>
+            <div class="premium-list">
+                <button type="button" class="locked" onclick="showPremium()">Send invoice by email</button>
+                <button type="button" class="locked" onclick="showPremium()">WhatsApp messages</button>
+                <button type="button" class="locked" onclick="showPremium()">Automated reminders</button>
+                <button type="button" class="locked" onclick="showPremium()">Property Pipeline</button>
+                <button type="button" class="locked" onclick="showPremium()">Advanced charts</button>
+                <button type="button" class="locked" onclick="showPremium()">OCR bill scanning</button>
+                <button type="button" class="locked" onclick="showPremium()">Multi-user roles</button>
+                <button type="button" class="locked" onclick="showPremium()">Automated backups</button>
+            </div>
+            <p class="fine-print">Free open-source edition by <strong>Nexera Ventures</strong>. Email, WhatsApp, automated reminders, the Property Pipeline, advanced charts, OCR, multi-user roles, and automated backups stay locked. Premium feature – contact Nexera Ventures</p>
+        </section>
+    </main>
+    <script src="/static/js/chart.umd.min.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

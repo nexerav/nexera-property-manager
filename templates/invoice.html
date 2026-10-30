@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ invoice.number }}</title>
+    <style>
+        body { font-family: system-ui, sans-serif; color: #1a202c; margin: 0; background: #f5f7fa; }
+        .sheet { max-width: 800px; margin: 1.5rem auto; background: white; padding: 2rem; border-radius: 8px; }
+        header { display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
+        img { max-height: 64px; max-width: 180px; }
+        h1 { margin: 0; color: #1a365d; font-size: 1.4rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; }
+        th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #e2e8f0; }
+        .num { text-align: right; }
+        .actions { margin-top: 1.5rem; display: flex; gap: 0.5rem; }
+        button { font: inherit; padding: 0.5rem 0.8rem; border-radius: 4px; border: none; cursor: pointer; }
+        .print { background: #2b6cb0; color: white; text-decoration: none; display: inline-block; }
+        .muted { color: #4a5568; white-space: pre-line; }
+        .locked { background: #a0aec0; color: white; }
+        .back { background: white; color: #1a365d; border: 1px solid #cbd5e0; text-decoration: none; padding: 0.5rem 0.8rem; border-radius: 4px; }
+        @media print { .actions { display: none; } body { background: white; } .sheet { margin: 0; } }
+    </style>
+</head>
+<body>
+    <article class="sheet">
+        <header>
+            <div>
+                {% if logo %}<img src="/logo" alt="">{% endif %}
+                <h1>{{ org.organisation_name or "Nexera Property Manager" }}</h1>
+                <div class="muted">
+                    {% if org.contact_name %}{{ org.contact_name }}<br>{% endif %}
+                    {% if org.address %}{{ org.address }}<br>{% endif %}
+                    {% if org.phone %}{{ org.phone }}<br>{% endif %}
+                    {% if org.email %}{{ org.email }}<br>{% endif %}
+                    {% if org.registration_number %}{{ org.registration_number }}{% endif %}
+                </div>
+            </div>
+            <div>
+                <strong>{{ invoice.number }}</strong><br>
+                {{ invoice.status }}<br>
+                Date {{ invoice.date }}
+                {% if invoice.due_date %}<br>Due {{ invoice.due_date }}{% endif %}
+            </div>
+        </header>
+        <p>
+            <strong>{{ invoice.tenant }}</strong><br>
+            {% if prop %}{{ prop.name }}{% if prop.address %}<br>{{ prop.address }}{% endif %}{% endif %}
+        </p>
+        <table>
+            <thead>
+                <tr><th>Description</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Amount</th></tr>
+            </thead>
+            <tbody>
+                {% for item in invoice.line_items %}
+                <tr>
+                    <td>{{ item.description }}</td>
+                    <td class="num">{{ item.quantity }}</td>
+                    <td class="num">R {{ "%.2f"|format(item.unit_price) }}</td>
+                    <td class="num">R {{ "%.2f"|format(item.amount) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr><th colspan="3" class="num">Total</th><th class="num">R {{ "%.2f"|format(invoice.total) }}</th></tr>
+            </tfoot>
+        </table>
+        {% if invoice.notes %}<p class="muted">{{ invoice.notes }}</p>{% endif %}
+        {% if org.payment_details %}<p><strong>Payment details</strong><br><span class="muted">{{ org.payment_details }}</span></p>{% endif %}
+        <div class="actions">
+            <button type="button" class="print" onclick="window.print()">Print</button>
+            <a class="print" href="/invoices/{{ invoice.id }}/pdf">Download PDF</a>
+            <button type="button" class="locked" onclick="alert('{{ premium_message }}')">Email invoice</button>
+            <a class="back" href="/">Back</a>
+        </div>
+    </article>
+</body>
+</html>
