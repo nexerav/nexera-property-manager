@@ -11,7 +11,7 @@ Nexera Property Manager is a local application. One person signs in. The records
 
 ## Reporting a vulnerability
 
-Email security reports to [costa@nexerav.com](mailto:costa@nexerav.com). Please do not open a public GitHub issue for a security flaw, and do not send your data file.
+Email security reports to [support@nexerav.com](mailto:support@nexerav.com). Please do not open a public GitHub issue for a security flaw, and do not send your data file.
 
 Include the version or commit, what you observed, and how to reproduce it. You should hear back within 10 days. If you do not, send the email again. A fix for a confirmed flaw will be published in this repository when it is ready.
 

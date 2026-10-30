@@ -122,6 +122,8 @@ See [SECURITY.md](SECURITY.md) for how to report a vulnerability. Do not include
 
 GitHub issues are welcome for bugs and for changes you can describe clearly. Nexera Ventures reads them on a best-effort basis. There is no support contract, no setup call, and no data-recovery service attached to this free edition. Please do not post private tenant or property information.
 
+Email [support@nexerav.com](mailto:support@nexerav.com) for a question that should not be a public issue, including a security report.
+
 For hosting, more than one user, or the locked features, use the contact details on [nexerav.com](https://www.nexerav.com).
 
 ## Contributing

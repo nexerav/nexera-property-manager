@@ -9,4 +9,4 @@ This project is a public workshop, not a support desk. Be direct, be specific, a
 
 Maintainers may edit, hide, or lock comments and issues that break these points. Repeated abuse can mean a block from the repository.
 
-Questions about this file can go to [costa@nexerav.com](mailto:costa@nexerav.com).
+Questions about this file can go to [support@nexerav.com](mailto:support@nexerav.com).
