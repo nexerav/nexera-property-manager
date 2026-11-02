@@ -11,4 +11,14 @@ services:
       - SECRET_KEY=${SECRET_KEY:?Set SECRET_KEY in .env before starting}
       - APP_USERNAME=${APP_USERNAME:-admin}
       - APP_PASSWORD=${APP_PASSWORD:?Set APP_PASSWORD in .env before starting}
+      - DEMO_MODE=${DEMO_MODE:-}
+      - ALLOW_PASSWORD_RESET=${ALLOW_PASSWORD_RESET:-}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+      - SMTP_TLS=${SMTP_TLS:-}
+      - PASSWORD_RESET_EMAIL=${PASSWORD_RESET_EMAIL:-}
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
     restart: unless-stopped

@@ -13,9 +13,12 @@ from io import BytesIO
 from xml.sax.saxutils import escape
 import os
 import json
+import sys
 import threading
 import uuid
 from dotenv import load_dotenv
+
+import auth
 
 load_dotenv()
 
@@ -591,30 +594,152 @@ def health():
     return jsonify({"status": "ok", "version": "oss-1.1"})
 
 
+def login_page(error=None):
+    brand = page_brand()
+    return render_template(
+        "login.html",
+        error=error,
+        logo=brand["logo"],
+        organisation_name=brand["organisation_name"],
+        show_reset=not auth.web_reset_blocked(VALID_USERNAME),
+    )
+
+
+def reset_allowed():
+    if auth.web_reset_blocked(VALID_USERNAME):
+        return False
+    return True
+
+
+def public_base():
+    configured = (os.environ.get("PUBLIC_BASE_URL") or "").strip().rstrip("/")
+    if configured:
+        return configured
+    return request.url_root.rstrip("/")
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         username = request.form.get("username", "")
         password = request.form.get("password", "")
-        if username == VALID_USERNAME and password == VALID_PASSWORD:
+        if not _data_lock.acquire(timeout=8):
+            return login_page("The data file is busy. Wait a moment and try again.")
+        try:
+            data = load_data()
+            ok, error, changed = auth.attempt_sign_in(
+                data,
+                username,
+                password,
+                VALID_USERNAME,
+                VALID_PASSWORD,
+                auth.utc_now(),
+            )
+            if changed:
+                save_data(data)
+        finally:
+            _data_lock.release()
+        if ok:
+            session.clear()
             session["logged_in"] = True
             session["username"] = VALID_USERNAME
             return redirect(url_for("dashboard"))
-        brand = page_brand()
-        return render_template(
-            "login.html",
-            error="Invalid credentials",
-            logo=brand["logo"],
-            organisation_name=brand["organisation_name"],
-        )
+        return login_page(error)
     if session.get("logged_in"):
         return redirect(url_for("dashboard"))
+    return login_page()
+
+
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if not reset_allowed():
+        return auth.DEMO_RESET_MESSAGE, 403
     brand = page_brand()
+    message = None
+    mail_ready = auth.smtp_settings() is not None
+    if request.method == "POST" and mail_ready:
+        if not _data_lock.acquire(timeout=8):
+            message = "The data file is busy. Wait a moment and try again."
+        else:
+            try:
+                data = load_data()
+                message = auth.request_reset(
+                    data,
+                    request.form.get("username", ""),
+                    VALID_USERNAME,
+                    auth.utc_now(),
+                    lambda token: public_base() + "/reset/" + token,
+                )
+                save_data(data)
+            finally:
+                _data_lock.release()
     return render_template(
-        "login.html",
+        "forgot.html",
         logo=brand["logo"],
         organisation_name=brand["organisation_name"],
+        mail_ready=mail_ready,
+        message=message,
     )
+
+
+@app.route("/reset/<token>", methods=["GET", "POST"])
+def reset_with_token(token):
+    if not reset_allowed():
+        return auth.DEMO_RESET_MESSAGE, 403
+    if not isinstance(token, str) or len(token) > 200:
+        token = ""
+    brand = page_brand()
+    now = auth.utc_now()
+    error = None
+    if request.method == "POST":
+        new_password = request.form.get("password", "")
+        confirm = request.form.get("confirm", "")
+        if new_password != confirm:
+            error = "Those passwords do not match."
+        elif not _data_lock.acquire(timeout=8):
+            error = "The data file is busy. Wait a moment and try again."
+        else:
+            try:
+                data = load_data()
+                status = auth.token_status(data, token, now)
+                if status != "ok":
+                    error = "This reset link is not valid. Ask for a new one, or reset the password from the server."
+                    token = ""
+                else:
+                    problem = auth.apply_new_password(data, new_password, INSECURE_PASSWORDS)
+                    if problem:
+                        error = problem
+                    else:
+                        save_data(data)
+                        session.clear()
+                        session["logged_in"] = True
+                        session["username"] = VALID_USERNAME
+                        return redirect(url_for("dashboard"))
+            finally:
+                _data_lock.release()
+    else:
+        if not _data_lock.acquire(timeout=8):
+            error = "The data file is busy. Wait a moment and try again."
+        else:
+            try:
+                data = load_data()
+                if auth.token_status(data, token, now) != "ok":
+                    error = "This reset link is not valid. Ask for a new one, or reset the password from the server."
+                    token = ""
+            finally:
+                _data_lock.release()
+    response = render_template(
+        "reset.html",
+        logo=brand["logo"],
+        organisation_name=brand["organisation_name"],
+        error=error,
+        token=token,
+    )
+    # The token is in the address. Don't let the browser send it onward.
+    rendered = app.make_response(response)
+    rendered.headers["Referrer-Policy"] = "no-referrer"
+    rendered.headers["Cache-Control"] = "no-store"
+    return rendered
 
 
 @app.route("/logout")
@@ -632,6 +757,7 @@ def dashboard():
         premium_message=PREMIUM_MESSAGE,
         logo=brand["logo"],
         organisation_name=brand["organisation_name"],
+        allow_password_change=reset_allowed(),
     )
 
 
@@ -1296,6 +1422,31 @@ def api_settings():
     return jsonify(public_settings(data))
 
 
+@app.route("/api/password", methods=["POST"])
+@login_required
+@uses_data
+def api_password():
+    if not reset_allowed():
+        return jsonify({"error": auth.DEMO_RESET_MESSAGE}), 403
+    body = payload()
+    current = body.get("current_password", "")
+    new_password = body.get("new_password", "")
+    confirm = body.get("confirm_password", "")
+    if not isinstance(current, str) or not isinstance(new_password, str) or not isinstance(confirm, str):
+        return jsonify({"error": auth.PASSWORD_RULE}), 400
+    if new_password != confirm:
+        return jsonify({"error": "Those passwords do not match."}), 400
+    data = load_data()
+    record = auth.ensure_auth(data)
+    if not auth.password_is_current(current, record, VALID_PASSWORD):
+        return jsonify({"error": "Current password is not right."}), 400
+    problem = auth.apply_new_password(data, new_password, INSECURE_PASSWORDS)
+    if problem:
+        return jsonify({"error": problem}), 400
+    save_data(data)
+    return jsonify({"ok": True})
+
+
 @app.route("/premium")
 @login_required
 def premium_info():
@@ -1305,7 +1456,24 @@ def premium_info():
     })
 
 
-if __name__ == "__main__":
+def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "reset-password":
+        try:
+            auth.cli_reset(
+                sys.argv[2:],
+                load_data,
+                save_data,
+                VALID_USERNAME,
+                INSECURE_PASSWORDS,
+            )
+        except auth.ResetError as exc:
+            print(str(exc), file=sys.stderr)
+            sys.exit(1)
+        return
     if not os.path.exists(DATA_FILE):
         save_data(load_data())
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "5000")), debug=debug_requested())
+
+
+if __name__ == "__main__":
+    main()

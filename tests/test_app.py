@@ -10,6 +10,8 @@ import unittest
 import zlib
 from datetime import datetime as RealDateTime
 
+import auth
+
 TEMP_DIR = tempfile.mkdtemp()
 DATA_FILE = os.path.join(TEMP_DIR, "rental_data.json")
 os.environ["DATA_FILE"] = DATA_FILE
@@ -338,6 +340,324 @@ class PropertyAppTest(unittest.TestCase):
         removed = self.client.delete("/api/logo")
         self.assertEqual(removed.status_code, 200)
         self.assertFalse(self.client.get("/api/settings").get_json()["logo"])
+
+    def run_reset(self, password, extra_env=None, args=None):
+        env = os.environ.copy()
+        env["DATA_FILE"] = DATA_FILE
+        env["SECRET_KEY"] = "unit-test-secret"
+        env["APP_USERNAME"] = "admin"
+        env["APP_PASSWORD"] = "unit-test-password"
+        env.pop("DEMO_MODE", None)
+        env.pop("ALLOW_PASSWORD_RESET", None)
+        env.pop("APP_PASSWORD_RESET", None)
+        if password is not None:
+            env["APP_PASSWORD_RESET"] = password
+        if extra_env:
+            env.update(extra_env)
+        command = [sys.executable, "app.py", "reset-password"]
+        if args:
+            command.extend(args)
+        root = os.path.dirname(os.path.abspath(pm.__file__))
+        return subprocess.run(
+            command,
+            cwd=root,
+            env=env,
+            capture_output=True,
+            text=True,
+            stdin=subprocess.DEVNULL,
+        )
+
+    def test_password_can_be_changed_and_reset_from_the_server(self):
+        guest = pm.app.test_client()
+        login = guest.get("/login")
+        self.assertIn(b"Forgot password?", login.data)
+        help_page = guest.get("/forgot-password")
+        self.assertEqual(help_page.status_code, 200)
+        self.assertIn(b"python3 app.py reset-password", help_page.data)
+        self.assertNotIn(b"Send reset link", help_page.data)
+        self.assertEqual(guest.post("/forgot-password", data={"username": "admin"}).status_code, 200)
+        with open(DATA_FILE) as handle:
+            saved = json.load(handle)
+        self.assertFalse((saved.get("auth") or {}).get("reset_token_hash"))
+
+        page = self.client.get("/")
+        self.assertIn(b"Change password", page.data)
+        self.assertIn(b"Current password", page.data)
+        refused = self.client.post("/api/password", json={
+            "current_password": "wrong-current-password",
+            "new_password": "replacement-password",
+            "confirm_password": "replacement-password",
+        })
+        self.assertEqual(refused.status_code, 400)
+        mismatch = self.client.post("/api/password", json={
+            "current_password": "unit-test-password",
+            "new_password": "replacement-password",
+            "confirm_password": "other-replacement",
+        })
+        self.assertEqual(mismatch.status_code, 400)
+        short = self.client.post("/api/password", json={
+            "current_password": "unit-test-password",
+            "new_password": "short",
+            "confirm_password": "short",
+        })
+        self.assertEqual(short.status_code, 400)
+        changed = self.client.post("/api/password", json={
+            "current_password": "unit-test-password",
+            "new_password": "replacement-password",
+            "confirm_password": "replacement-password",
+        })
+        self.assertEqual(changed.status_code, 200)
+        self.assertNotIn("password_hash", self.client.get("/api/settings").get_json())
+        with open(DATA_FILE) as handle:
+            stored = json.load(handle)
+        auth_state = stored["auth"]
+        self.assertTrue(auth_state["password_hash"])
+        self.assertNotIn("replacement-password", json.dumps(stored))
+        self.assertNotEqual(auth_state["password_hash"], "replacement-password")
+        self.client.get("/logout")
+        old = self.client.post("/login", data={"username": "admin", "password": "unit-test-password"})
+        self.assertIn(b"Invalid credentials", old.data)
+        new = self.client.post(
+            "/login",
+            data={"username": "admin", "password": "replacement-password"},
+            follow_redirects=True,
+        )
+        self.assertEqual(new.status_code, 200)
+        self.assertIn(b"Change password", new.data)
+
+        missing = self.run_reset(None)
+        self.assertNotEqual(missing.returncode, 0)
+        self.assertNotIn("replacement-password", missing.stdout + missing.stderr)
+        leaked = self.run_reset(None, args=["hunter2-from-argv"])
+        self.assertNotEqual(leaked.returncode, 0)
+        self.assertNotIn("hunter2-from-argv", leaked.stdout)
+        self.assertNotIn("hunter2-from-argv", leaked.stderr)
+
+    def test_lockout_is_cleared_by_reset(self):
+        guest = pm.app.test_client()
+        for _ in range(4):
+            wrong = guest.post("/login", data={"username": "admin", "password": "not-the-password"})
+            self.assertIn(b"Invalid credentials", wrong.data)
+        locked = guest.post("/login", data={"username": "admin", "password": "not-the-password"})
+        self.assertIn(b"Too many sign-in attempts", locked.data)
+        still = guest.post("/login", data={"username": "admin", "password": "unit-test-password"})
+        self.assertIn(b"Too many sign-in attempts", still.data)
+        self.assertNotIn(b"Change password", still.data)
+
+        result = self.run_reset("server-reset-password")
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertNotIn("server-reset-password", result.stdout)
+        self.assertNotIn("server-reset-password", result.stderr)
+        self.assertIn("Password updated", result.stdout)
+        fresh = pm.app.test_client()
+        denied = fresh.post("/login", data={"username": "admin", "password": "unit-test-password"})
+        self.assertIn(b"Invalid credentials", denied.data)
+        allowed = fresh.post(
+            "/login",
+            data={"username": "admin", "password": "server-reset-password"},
+            follow_redirects=True,
+        )
+        self.assertEqual(allowed.status_code, 200)
+        self.assertIn(b"Change password", allowed.data)
+
+    def test_email_reset_link_expires_and_is_single_use(self):
+        os.environ["SMTP_HOST"] = "smtp.example.com"
+        os.environ["SMTP_FROM"] = "reset@example.com"
+        os.environ["PASSWORD_RESET_EMAIL"] = "owner@example.com"
+        os.environ["PUBLIC_BASE_URL"] = "https://books.example.com"
+        sent = []
+        original = auth.deliver_email
+
+        def capture(settings, subject, body):
+            sent.append({"settings": settings, "subject": subject, "body": body})
+
+        auth.deliver_email = capture
+        try:
+            guest = pm.app.test_client()
+            form = guest.get("/forgot-password")
+            self.assertIn(b"Send reset link", form.data)
+            wrong = guest.post("/forgot-password", data={"username": "someone-else"})
+            self.assertEqual(wrong.status_code, 200)
+            self.assertEqual(sent, [])
+            self.assertNotIn(b"/reset/", wrong.data)
+            asked = guest.post("/forgot-password", data={"username": "admin"})
+            self.assertEqual(asked.status_code, 200)
+            self.assertIn(b"reset link is on its way", asked.data)
+            self.assertEqual(len(sent), 1)
+            self.assertEqual(sent[0]["settings"]["recipient"], "owner@example.com")
+            self.assertNotIn(b"https://", asked.data)
+            token = ""
+            for line in sent[0]["body"].splitlines():
+                if "/reset/" in line:
+                    token = line.strip().split("/reset/", 1)[1]
+            self.assertTrue(token)
+            self.assertNotIn(token.encode(), asked.data)
+            with open(DATA_FILE) as handle:
+                stored = json.load(handle)["auth"]
+            self.assertNotIn(token, json.dumps(stored))
+            self.assertEqual(len(stored["reset_token_hash"]), 64)
+            self.assertTrue(sent[0]["body"].startswith("A password reset") or "https://books.example.com/reset/" in sent[0]["body"])
+            self.assertIn("https://books.example.com/reset/" + token, sent[0]["body"])
+
+            page = guest.get("/reset/" + token)
+            self.assertEqual(page.status_code, 200)
+            self.assertIn(b"New password", page.data)
+            self.assertNotIn(token.encode(), page.data)
+            mismatch = guest.post("/reset/" + token, data={"password": "emailed-reset-password", "confirm": "nope"})
+            self.assertIn(b"do not match", mismatch.data)
+            updated = guest.post(
+                "/reset/" + token,
+                data={"password": "emailed-reset-password", "confirm": "emailed-reset-password"},
+                follow_redirects=True,
+            )
+            self.assertEqual(updated.status_code, 200)
+            self.assertIn(b"Change password", updated.data)
+            again = guest.get("/reset/" + token)
+            self.assertIn(b"not valid", again.data)
+            self.assertNotIn(b'name="password"', again.data)
+
+            # A second link can be issued, then expired before it is used.
+            sent.clear()
+            guest.get("/logout")
+            guest.post("/forgot-password", data={"username": "admin"})
+            self.assertEqual(len(sent), 1)
+            expired_token = ""
+            for line in sent[0]["body"].splitlines():
+                if "/reset/" in line:
+                    expired_token = line.strip().split("/reset/", 1)[1]
+            with open(DATA_FILE) as handle:
+                data = json.load(handle)
+            data["auth"]["reset_token_expires"] = "2000-01-01T00:00:00Z"
+            data["auth"]["locked_until"] = "2999-01-01T00:00:00Z"
+            with open(DATA_FILE, "w") as handle:
+                json.dump(data, handle)
+            expired = guest.get("/reset/" + expired_token)
+            self.assertIn(b"not valid", expired.data)
+            # The expired link must not clear the lock. A fresh command does.
+            blocked = guest.post("/login", data={"username": "admin", "password": "emailed-reset-password"})
+            self.assertIn(b"Too many sign-in attempts", blocked.data)
+            result = self.run_reset("after-expired-link")
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+            cleared = guest.post(
+                "/login",
+                data={"username": "admin", "password": "after-expired-link"},
+                follow_redirects=True,
+            )
+            self.assertIn(b"Change password", cleared.data)
+
+            called = {"n": 0}
+
+            def broken(settings, subject, body):
+                called["n"] += 1
+                raise OSError("smtp down")
+
+            with open(DATA_FILE) as handle:
+                data = json.load(handle)
+            data["auth"]["reset_requests"] = []
+            with open(DATA_FILE, "w") as handle:
+                json.dump(data, handle)
+            auth.deliver_email = broken
+            failed_send = guest.post("/forgot-password", data={"username": "admin"})
+            self.assertEqual(called["n"], 1)
+            self.assertNotIn(b"/reset/", failed_send.data)
+            with open(DATA_FILE) as handle:
+                after_failure = json.load(handle)["auth"]
+            self.assertFalse(after_failure.get("reset_token_hash"))
+        finally:
+            auth.deliver_email = original
+            os.environ.pop("SMTP_HOST", None)
+            os.environ.pop("SMTP_FROM", None)
+            os.environ.pop("PASSWORD_RESET_EMAIL", None)
+            os.environ.pop("PUBLIC_BASE_URL", None)
+
+    def test_demo_account_cannot_be_reset(self):
+        self.assertTrue(auth.web_reset_blocked("demo"))
+        os.environ["ALLOW_PASSWORD_RESET"] = "1"
+        try:
+            self.assertFalse(auth.web_reset_blocked("demo"))
+        finally:
+            os.environ.pop("ALLOW_PASSWORD_RESET", None)
+        self.assertTrue(auth.web_reset_blocked("demo"))
+
+        os.environ["DEMO_MODE"] = "1"
+        try:
+            guest = pm.app.test_client()
+            page = guest.get("/login")
+            self.assertNotIn(b"Forgot password?", page.data)
+            self.assertEqual(guest.post("/forgot-password", data={"username": "admin"}).status_code, 403)
+            self.assertEqual(guest.get("/reset/anything").status_code, 403)
+            denied = self.client.post("/api/password", json={
+                "current_password": "unit-test-password",
+                "new_password": "replacement-password",
+                "confirm_password": "replacement-password",
+            })
+            self.assertEqual(denied.status_code, 403)
+            dashboard = self.client.get("/")
+            self.assertNotIn(b"Change password", dashboard.data)
+        finally:
+            os.environ.pop("DEMO_MODE", None)
+
+        blocked = self.run_reset("should-not-apply-here", {"DEMO_MODE": "1"})
+        self.assertNotEqual(blocked.returncode, 0)
+        self.assertIn("DEMO_MODE", blocked.stderr)
+        self.assertNotIn("should-not-apply-here", blocked.stdout)
+        self.assertNotIn("should-not-apply-here", blocked.stderr)
+        guest = pm.app.test_client()
+        signed_in = guest.post(
+            "/login",
+            data={"username": "admin", "password": "unit-test-password"},
+            follow_redirects=True,
+        )
+        self.assertIn(b"Change password", signed_in.data)
+
+        demo_file = os.path.join(tempfile.mkdtemp(), "demo.json")
+        env = os.environ.copy()
+        env.update({
+            "DATA_FILE": demo_file,
+            "SECRET_KEY": "unit-test-secret",
+            "APP_USERNAME": "demo",
+            "APP_PASSWORD": "unit-test-password",
+            "SMTP_HOST": "smtp.example.com",
+            "SMTP_FROM": "reset@example.com",
+            "PASSWORD_RESET_EMAIL": "owner@example.com",
+        })
+        env.pop("DEMO_MODE", None)
+        env.pop("ALLOW_PASSWORD_RESET", None)
+        script = """
+import json, os
+from app import app
+client = app.test_client()
+page = client.get("/login")
+assert b"Forgot password?" not in page.data, page.data
+assert client.post("/forgot-password", data={"username": "demo"}).status_code == 403
+signed = client.post("/login", data={"username": "demo", "password": "unit-test-password"}, follow_redirects=True)
+assert signed.status_code == 200, signed.status_code
+assert b"Change password" not in signed.data
+changed = client.post("/api/password", json={
+    "current_password": "unit-test-password",
+    "new_password": "replacement-password",
+    "confirm_password": "replacement-password",
+})
+assert changed.status_code == 403, changed.status_code
+path = os.environ["DATA_FILE"]
+if os.path.exists(path):
+    with open(path) as handle:
+        saved = json.load(handle)
+    record = saved.get("auth") or {}
+    assert not record.get("password_hash")
+    assert not record.get("reset_token_hash")
+print("demo-ok")
+"""
+        root = os.path.dirname(os.path.abspath(pm.__file__))
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=root,
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("demo-ok", result.stdout)
 
 
 def pdf_bytes(data):

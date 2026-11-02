@@ -27,6 +27,28 @@ docker compose up -d --build
 
 Open http://127.0.0.1:5000 and sign in as `admin` (or your `APP_USERNAME`) with the password you set. The app will not start with a missing or placeholder `SECRET_KEY` / `APP_PASSWORD`. Your data lives in `./data/rental_data.json` and survives `docker compose down`.
 
+## If you are locked out
+
+Five wrong passwords lock sign-in for 15 minutes. You can clear that, and choose a new password, from the machine that runs the app. The command asks for the password so it does not end up in your shell history:
+
+```bash
+python3 app.py reset-password
+```
+
+With Docker, from the project directory:
+
+```bash
+docker compose exec -it property-manager python app.py reset-password
+```
+
+The new password is stored as a hash in `data/rental_data.json` and is what signs in after that, including after a restart. `APP_PASSWORD` in `.env` is only the bootstrap password until the first reset.
+
+While you are signed in, Settings has the same change. It asks for the current password, then clears a lockout.
+
+If you set `SMTP_HOST`, `SMTP_FROM`, and `PASSWORD_RESET_EMAIL`, the sign-in page can email you a link. The link works once and expires after 30 minutes. Without those settings, no reset email is sent.
+
+The public demo must not be reset by a visitor. Set `DEMO_MODE=1` on that host. A username of `demo` also refuses a browser reset unless you set `ALLOW_PASSWORD_RESET=1` on a private install that really uses that username.
+
 ## Screenshots
 
 | Overview | Money | Invoices | Settings |
