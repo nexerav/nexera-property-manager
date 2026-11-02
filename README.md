@@ -51,6 +51,15 @@ The public demo must not be reset by a visitor. Set `DEMO_MODE=1` on that host. 
 
 With `DEMO_MODE=1`, a data file that has no rent is filled with fictional sample books for the last year, so the dashboard is not an empty month. A file that already has rent is left as it is. Settings and the password hash are kept. To show the sample story again, remove `demo_seed` from the data file (or replace the file) and start the app. The dashboard opens on the last 12 months.
 
+The nightly demo reset must use that same sample. Do not keep a second JSON file with fewer invoices. On the demo host, at 02:00 SAST (00:00 UTC):
+
+```bash
+cd /path/to/nexera-property-manager
+docker compose exec -T property-manager python app.py reset-demo
+```
+
+`scripts/reset-demo.sh` does the same thing. It only runs when `DEMO_MODE=1`. It writes six invoices (draft, issued, outstanding, overdue, and paid) and removes an uploaded logo. The password hash is kept.
+
 ## Screenshots
 
 | Overview | Money | Invoices | Settings |

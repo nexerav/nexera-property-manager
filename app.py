@@ -1584,6 +1584,25 @@ def premium_info():
     })
 
 
+def load_books_or_seed():
+    if os.path.exists(DATA_FILE):
+        try:
+            return load_data()
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
+            return seed_data()
+    return seed_data()
+
+
+def install_demo_story(existing):
+    """Write the current sample. Settings and the password hash are kept."""
+    story = demo_data.build_demo_story(datetime.now().date())
+    story["settings"] = existing.get("settings") if isinstance(existing.get("settings"), dict) else empty_settings()
+    story["auth"] = existing.get("auth") if isinstance(existing.get("auth"), dict) else {}
+    story["demo_seed"] = demo_data.DEMO_SEED_VERSION
+    save_data(story)
+    return story
+
+
 def ensure_demo_story():
     """Fill or refresh the public demo sample.
 
@@ -1592,13 +1611,7 @@ def ensure_demo_story():
     """
     if not auth.demo_mode():
         return
-    if os.path.exists(DATA_FILE):
-        try:
-            data = load_data()
-        except (OSError, json.JSONDecodeError, TypeError, ValueError):
-            data = seed_data()
-    else:
-        data = seed_data()
+    data = load_books_or_seed()
     if data.get("demo_seed") == demo_data.DEMO_SEED_VERSION:
         return
     rents = [
@@ -1609,17 +1622,30 @@ def ensure_demo_story():
     # refreshed. A file with rent and no demo_seed marker is someone's own books.
     if rents and not data.get("demo_seed"):
         return
-    story = demo_data.build_demo_story(datetime.now().date())
-    story["settings"] = data.get("settings") if isinstance(data.get("settings"), dict) else empty_settings()
-    story["auth"] = data.get("auth") if isinstance(data.get("auth"), dict) else {}
-    story["demo_seed"] = demo_data.DEMO_SEED_VERSION
-    save_data(story)
+    install_demo_story(data)
+
+
+def cli_reset_demo():
+    """Nightly demo reset. Always the same sample as the running app."""
+    if not auth.demo_mode():
+        print("reset-demo only runs when DEMO_MODE is set.", file=sys.stderr)
+        return 1
+    story = install_demo_story(load_books_or_seed())
+    folder = os.path.dirname(DATA_FILE) or "."
+    for name in LOGO_NAMES:
+        old = os.path.join(folder, name)
+        if os.path.isfile(old):
+            os.remove(old)
+    print(f"Demo books reset from the current sample. {len(story['invoices'])} invoices.")
+    return 0
 
 
 ensure_demo_story()
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "reset-demo":
+        sys.exit(cli_reset_demo())
     if len(sys.argv) > 1 and sys.argv[1] == "reset-password":
         try:
             auth.cli_reset(

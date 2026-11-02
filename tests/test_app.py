@@ -1083,6 +1083,97 @@ print("demo-ok")
             pm.DATA_FILE = old_file
 
 
+    def test_nightly_demo_reset_uses_the_six_invoice_sample(self):
+        folder = tempfile.mkdtemp()
+        path = os.path.join(folder, "rental_data.json")
+        with open(path, "w") as handle:
+            json.dump({
+                "properties": [{"id": "1", "name": "Old", "kind": "Residential"}],
+                "income": [{
+                    "id": "r",
+                    "property_id": "1",
+                    "amount": 1,
+                    "date": "2026-01-01",
+                    "income_type": "Rent",
+                    "tenant": "A. Tenant",
+                    "description": "Rent",
+                }],
+                "expenses": [],
+                "maintenance": [],
+                "invoices": [
+                    {
+                        "id": str(i),
+                        "number": f"OLD-{i}",
+                        "property_id": "1",
+                        "tenant": "A. Tenant",
+                        "date": "2026-01-01",
+                        "due_date": "",
+                        "status": "Issued",
+                        "notes": "",
+                        "line_items": [],
+                        "total": 1,
+                    }
+                    for i in range(4)
+                ],
+                "settings": {"organisation_name": "Keep Me"},
+                "auth": {"password_hash": "stay"},
+                "demo_seed": 1,
+            }, handle)
+        with open(os.path.join(folder, "logo.png"), "wb") as handle:
+            handle.write(b"\x89PNG\r\nnot-a-real-image")
+        env = os.environ.copy()
+        env.update({
+            "DATA_FILE": path,
+            "DEMO_MODE": "1",
+            "SECRET_KEY": "unit-test-secret",
+            "APP_USERNAME": "admin",
+            "APP_PASSWORD": "unit-test-password",
+        })
+        root = os.path.dirname(os.path.abspath(pm.__file__))
+        result = subprocess.run(
+            [sys.executable, "app.py", "reset-demo"],
+            cwd=root,
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("6 invoices", result.stdout)
+        with open(path) as handle:
+            saved = json.load(handle)
+        story = pm.demo_data.build_demo_story(__import__("datetime").date.today())
+        self.assertEqual(len(saved["invoices"]), 6)
+        self.assertEqual(
+            [row["number"] for row in saved["invoices"]],
+            [row["number"] for row in story["invoices"]],
+        )
+        self.assertEqual(
+            {row["status"] for row in saved["invoices"]},
+            {"Draft", "Issued", "Outstanding", "Overdue", "Paid"},
+        )
+        self.assertGreaterEqual(len({row["date"][:7] for row in saved["invoices"]}), 4)
+        self.assertEqual(saved["settings"]["organisation_name"], "Keep Me")
+        self.assertEqual(saved["auth"]["password_hash"], "stay")
+        self.assertFalse(os.path.isfile(os.path.join(folder, "logo.png")))
+
+        saved["invoices"] = saved["invoices"][:4]
+        with open(path, "w") as handle:
+            json.dump(saved, handle)
+        env.pop("DEMO_MODE")
+        refused = subprocess.run(
+            [sys.executable, "app.py", "reset-demo"],
+            cwd=root,
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("DEMO_MODE", refused.stderr)
+        with open(path) as handle:
+            left = json.load(handle)
+        self.assertEqual(len(left["invoices"]), 4)
+
+
 def has_text(values, snippet):
     return any(snippet in str(value) for value in values)
 

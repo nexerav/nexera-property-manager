@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.0
+
+- The nightly demo reset is `python app.py reset-demo` (or `scripts/reset-demo.sh`). It writes the same sample the app serves, including six invoices across months and statuses. A separate shorter seed is not used. It runs only when `DEMO_MODE=1`.
+
 ## 1.4.0
 
 ### QA fixes
