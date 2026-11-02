@@ -43,10 +43,7 @@ function esc(value) {
 }
 
 function money(value) {
-    const amount = Number(value);
-    const number = Number.isFinite(amount) ? amount : 0;
-    const formatted = Math.abs(number).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-    return (number < 0 ? "R -" : "R ") + formatted;
+    return formatZar(value);
 }
 
 function wholeQty(value) {
@@ -188,8 +185,20 @@ function renderSummary() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { position: "bottom" } },
-            scales: { y: { beginAtZero: true } },
+            plugins: {
+                legend: { position: "bottom" },
+                tooltip: {
+                    callbacks: {
+                        label: (item) => item.dataset.label + ": " + formatZar(item.parsed.y),
+                    },
+                },
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { callback: (value) => formatZar(value) },
+                },
+            },
         },
     });
 
@@ -314,7 +323,7 @@ function renderInvoices() {
     const body = document.querySelector("#invoice-table tbody");
     body.innerHTML = state.invoices.length
         ? state.invoices.map((invoice) => `<tr>
-            <td>${esc(invoice.number)}</td>
+            <td class="invoice-no">${esc(invoice.number)}</td>
             <td class="date">${esc(invoice.date)}</td>
             <td>${esc(propertyName(invoice.property_id))}</td>
             <td>${esc(invoice.tenant)}</td>

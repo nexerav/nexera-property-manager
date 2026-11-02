@@ -6,9 +6,9 @@ Several months of rent, a few recoveries, and ordinary expenses, so the
 dashboard is not an empty month with one odd recovery.
 """
 
-from datetime import timedelta
+from datetime import date, timedelta
 
-DEMO_SEED_VERSION = 1
+DEMO_SEED_VERSION = 2
 
 
 def _shift_month(today, back):
@@ -137,18 +137,32 @@ def build_demo_story(today):
         "description": "Geyser repair",
     })
 
-    due = today + timedelta(days=7)
+    # Six invoices across months: draft, sent, still owing, overdue, and paid.
+    invoice_plan = (
+        (0, 0, "Outstanding", 14, "Current rent, not due yet."),
+        (1, 1, "Overdue", -20, "Due last month and still unpaid."),
+        (2, 2, "Paid", 7, "Paid in that month."),
+        (3, 0, "Draft", 7, "Not sent yet."),
+        (5, 1, "Issued", 7, "Sent, and still open."),
+        (7, 2, "Paid", 7, "Paid in that month."),
+    )
     invoices = []
-    for prop_id, _name, _address, rent, tenant in units[:2]:
+    for number, (back, unit_index, status, due_offset, note) in enumerate(invoice_plan, start=1):
+        prop_id, _name, _address, rent, tenant = units[unit_index]
+        year, month = _shift_month(today, back)
+        invoice_date = date(year, month, min(8, 28))
+        due = invoice_date + timedelta(days=due_offset)
+        if status == "Overdue" and due >= today:
+            due = today - timedelta(days=3)
         invoices.append({
-            "id": f"demo-inv-{prop_id}",
-            "number": "INV-DEMO-" + prop_id[-1].upper(),
+            "id": f"demo-inv-{number:02d}",
+            "number": f"INV-DEMO-{invoice_date.year}{invoice_date.month:02d}-{number:02d}",
             "property_id": prop_id,
             "tenant": tenant,
-            "date": today.isoformat(),
+            "date": invoice_date.isoformat(),
             "due_date": due.isoformat(),
-            "status": "Issued",
-            "notes": "Sample invoice for the demo.",
+            "status": status,
+            "notes": note,
             "line_items": [{
                 "description": "Monthly rent",
                 "quantity": 1,

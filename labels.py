@@ -55,12 +55,21 @@ def category_help(label):
 
 
 def format_zar(value):
-    """R 8,500.00 everywhere: comma thousands, dot cents, R prefix."""
+    """The only rand format: R 8,500.00 (comma thousands, dot cents).
+
+    The browser copy lives in static/js/format.js and must match this.
+    """
     try:
         amount = float(value or 0)
     except (TypeError, ValueError):
         amount = 0.0
-    return "R " + f"{amount:,.2f}"
+    sign = "-" if amount < 0 else ""
+    whole, cents = f"{abs(amount):.2f}".split(".")
+    groups = []
+    while whole:
+        groups.append(whole[-3:])
+        whole = whole[:-3]
+    return f"R {sign}{','.join(reversed(groups))}.{cents}"
 
 
 def format_qty(value):

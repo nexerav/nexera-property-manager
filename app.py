@@ -110,7 +110,7 @@ RECOVERY_CATEGORIES = [
     "Other Utility",
 ]
 EXPENSE_CATEGORIES = [name for name, _help in labels.EXPENSE_CHOICES]
-INVOICE_STATUSES = ["Draft", "Issued"]
+INVOICE_STATUSES = ["Draft", "Issued", "Outstanding", "Overdue", "Paid"]
 LOGO_NAMES = ("logo.png", "logo.jpg", "logo.jpeg", "logo.gif", "logo.webp")
 TEXT_SETTINGS = {
     "organisation_name": 160,
@@ -371,7 +371,7 @@ def read_settings(body, existing):
 
 
 def pdf_money(value):
-    return "R " + f"{float(value):,.2f}"
+    return labels.format_zar(value)
 
 
 def pdf_qty(value):
@@ -597,6 +597,14 @@ def filtered_rows(rows, start, end, property_id):
         chosen.append(row)
     chosen.sort(key=lambda row: (row.get("date") or "", row.get("id") or ""), reverse=True)
     return chosen
+
+
+@app.route("/favicon.ico")
+def favicon():
+    return send_file(
+        os.path.join(app.root_path, "static", "favicon.ico"),
+        mimetype="image/x-icon",
+    )
 
 
 @app.route("/health")
@@ -1577,10 +1585,10 @@ def premium_info():
 
 
 def ensure_demo_story():
-    """Fill a demo that has no rent with a fictional year of books.
+    """Fill or refresh the public demo sample.
 
-    A file that already has rent is left alone, so a customised demo is not wiped.
-    Settings and the password hash are kept.
+    A file with rent and no demo_seed marker is left alone. An older demo_seed
+    is replaced with the current sample. Settings and the password hash are kept.
     """
     if not auth.demo_mode():
         return
@@ -1597,7 +1605,9 @@ def ensure_demo_story():
         row for row in data.get("income") or []
         if (row.get("income_type") or "Rent") == "Rent" and row.get("amount")
     ]
-    if rents:
+    # An older copy of our own sample (demo_seed set, but not this version) is
+    # refreshed. A file with rent and no demo_seed marker is someone's own books.
+    if rents and not data.get("demo_seed"):
         return
     story = demo_data.build_demo_story(datetime.now().date())
     story["settings"] = data.get("settings") if isinstance(data.get("settings"), dict) else empty_settings()

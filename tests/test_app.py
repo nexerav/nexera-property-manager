@@ -983,6 +983,25 @@ print("demo-ok")
         script = self.client.get("/static/js/app.js")
         self.assertIn(b"Confirm delete", script.data)
         self.assertEqual(pm.labels.format_zar(8500), "R 8,500.00")
+        self.assertEqual(pm.labels.format_zar(-8500), "R -8,500.00")
+        self.assertNotIn(" ", pm.labels.format_zar(8500).replace("R ", "", 1))
+        format_js = self.client.get("/static/js/format.js")
+        self.assertEqual(format_js.status_code, 200)
+        compared = subprocess.run(
+            ["node", "-e", format_js.get_data(as_text=True) + "\nconsole.log(formatZar(8500)); console.log(formatZar(-1200.5));"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        self.assertEqual(compared.stdout.splitlines(), ["R 8,500.00", pm.labels.format_zar(-1200.5)])
+        icon = self.client.get("/favicon.ico")
+        self.assertEqual(icon.status_code, 200)
+        self.assertTrue(icon.data[:4] in (b"\x00\x00\x01\x00", b"\x89PNG"))
+        self.assertEqual(self.client.get("/static/favicon.svg").status_code, 200)
+        css = self.client.get("/static/css/app.css").get_data(as_text=True)
+        self.assertIn(".invoice-no", css)
+        self.assertIn("nowrap", css)
+        self.assertIn("--muted: #2d3748", css)
         self.assertEqual(pm.labels.format_qty(1.0), "1")
         self.assertEqual(pm.labels.format_qty(1.5), "1.50")
 
@@ -1019,7 +1038,12 @@ print("demo-ok")
             rents = [row for row in saved["income"] if row.get("income_type") == "Rent"]
             self.assertGreaterEqual(len(rents), 24)
             self.assertGreaterEqual(len({row["date"][:7] for row in rents}), 8)
-            self.assertEqual(saved["demo_seed"], 1)
+            self.assertEqual(saved["demo_seed"], pm.demo_data.DEMO_SEED_VERSION)
+            statuses = {row.get("status") for row in saved["invoices"]}
+            self.assertGreaterEqual(len(saved["invoices"]), 5)
+            self.assertTrue({"Draft", "Paid", "Overdue", "Outstanding"} <= statuses)
+            months = {row["date"][:7] for row in saved["invoices"]}
+            self.assertGreaterEqual(len(months), 4)
             self.assertTrue(any(row.get("name") == "Company Expenses" and row.get("kind") == "Overhead" for row in saved["properties"]))
             pm.ensure_demo_story()
             with open(path) as handle:

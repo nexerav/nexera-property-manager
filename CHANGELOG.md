@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.4.0
+
+### QA fixes
+
+- Every amount uses one format, `R 8,500.00`: the screen, the invoice, the chart, the PDF, and Excel. The browser and the server share that pattern (comma thousands, dot cents), including a South African browser that would otherwise show `R 8 500,00`.
+- The demo sample now has six invoices across several months: draft, issued, outstanding, overdue, and paid. An older demo sample (marked `demo_seed` 1) is refreshed on startup. A file with rent and no `demo_seed` marker is still left alone.
+- Invoice numbers stay on one line.
+- The app serves a navy N favicon at `/favicon.ico`, and the chart file no longer asks for a missing source map.
+- Helper text and the footer use `#2d3748`, which is about 12:1 on white and clears WCAG AA.
+
+Redeploy the demo with the usual rebuild. `DEMO_MODE=1` refreshes the sample invoices if the file was the previous demo seed:
+
+```bash
+git pull
+docker compose up -d --build
+```
+
 ## 1.3.0
 
 ### Demo and screen polish
