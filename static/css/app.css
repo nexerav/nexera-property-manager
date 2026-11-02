@@ -162,6 +162,34 @@ button.locked, .locked {
 .section { padding: 1.1rem 1.2rem; margin-bottom: 1rem; }
 .section h2 { margin: 0 0 0.8rem; font-size: 1.15rem; }
 
+.section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.75rem 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.85rem;
+}
+
+.section-head h2 { margin: 0; }
+.section-head .hint { margin: 0.25rem 0 0; }
+
+.export-bar { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+
+a.secondary {
+    display: inline-block;
+    padding: 0.45rem 0.75rem;
+    background: white;
+    color: var(--navy);
+    border: 1px solid #cbd5e0;
+    border-radius: 4px;
+    text-decoration: none;
+    line-height: 1.2;
+    font-size: 0.92rem;
+}
+
+a.secondary:hover { background: #edf2f7; }
+
 .form-grid, .split {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

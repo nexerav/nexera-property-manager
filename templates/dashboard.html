@@ -53,10 +53,22 @@
                 <label for="property-filter">Property</label>
                 <select id="property-filter" data-properties data-blank="All properties"></select>
             </div>
-            <p class="hint" style="flex-basis:100%; margin:0;">The period filters totals and the money list. Maintenance keeps every request for the selected property, so older open jobs stay visible.</p>
+            <p class="hint" style="flex-basis:100%; margin:0;">The period filters totals, the money list, and every PDF and Excel export. The on-screen invoice list and maintenance still show every record for the selected property, so older invoices and open jobs stay visible.</p>
         </div>
 
         <section data-view="overview">
+            <div class="section">
+                <div class="section-head">
+                    <div>
+                        <h2>Profit and loss</h2>
+                        <p class="hint">Income and expenses for the period and property selected above, in rand. This is the report to hand to an accountant.</p>
+                    </div>
+                    <div class="export-bar">
+                        <a class="secondary" data-export="/export/profit-and-loss.pdf" href="/export/profit-and-loss.pdf?period=month">Export PDF</a>
+                        <a class="secondary" data-export="/export/profit-and-loss.xlsx" href="/export/profit-and-loss.xlsx?period=month">Export Excel</a>
+                    </div>
+                </div>
+            </div>
             <div class="cards" id="summary-cards">
                 <div class="card"><h3>Loading</h3><div class="value">…</div><div class="hint">Fetching your portfolio.</div></div>
             </div>
@@ -104,8 +116,16 @@
                 </form>
             </div>
             <div class="section">
-                <h2>Portfolio</h2>
-                <p class="hint">Income, expenses, and net use the period selected above. Use Company Expenses for overhead that is not tied to one unit.</p>
+                <div class="section-head">
+                    <div>
+                        <h2>Rent roll</h2>
+                        <p class="hint">Units, the current tenant, and income, expenses, and net for the period selected above. Use Company Expenses for overhead that is not tied to one unit.</p>
+                    </div>
+                    <div class="export-bar">
+                        <a class="secondary" data-export="/export/rent-roll.pdf" href="/export/rent-roll.pdf?period=month">Export PDF</a>
+                        <a class="secondary" data-export="/export/rent-roll.xlsx" href="/export/rent-roll.xlsx?period=month">Export Excel</a>
+                    </div>
+                </div>
                 <div class="table-wrap">
                     <table id="property-table">
                         <thead>
@@ -198,7 +218,16 @@
                 </form>
             </div>
             <div class="section">
-                <h2>Records in this period</h2>
+                <div class="section-head">
+                    <div>
+                        <h2>Transactions in this period</h2>
+                        <p class="hint">Income and expenses for the period and property selected above.</p>
+                    </div>
+                    <div class="export-bar">
+                        <a class="secondary" data-export="/export/transactions.pdf" href="/export/transactions.pdf?period=month">Export PDF</a>
+                        <a class="secondary" data-export="/export/transactions.xlsx" href="/export/transactions.xlsx?period=month">Export Excel</a>
+                    </div>
+                </div>
                 <div class="table-wrap">
                     <table id="money-table">
                         <thead>
@@ -330,7 +359,16 @@
                 </form>
             </div>
             <div class="section">
-                <h2>Invoices</h2>
+                <div class="section-head">
+                    <div>
+                        <h2>Invoices</h2>
+                        <p class="hint">Export PDF and Export Excel download the register for the period selected above. The table below keeps every invoice for the selected property. Each invoice also has its own PDF and Excel file.</p>
+                    </div>
+                    <div class="export-bar">
+                        <a class="secondary" data-export="/export/invoices.pdf" href="/export/invoices.pdf?period=month">Export PDF</a>
+                        <a class="secondary" data-export="/export/invoices.xlsx" href="/export/invoices.xlsx?period=month">Export Excel</a>
+                    </div>
+                </div>
                 <div class="table-wrap">
                     <table id="invoice-table">
                         <thead>
@@ -340,12 +378,30 @@
                     </table>
                 </div>
             </div>
+            <div class="section">
+                <div class="section-head">
+                    <div>
+                        <h2>Tenant statement</h2>
+                        <p class="hint">Invoices are charges and income recorded against the tenant is payments, for the period and property selected above. Hand this to a tenant, or keep it with the books.</p>
+                    </div>
+                    <div class="export-bar">
+                        <a class="secondary" data-export="/export/tenant-statement.pdf" data-tenant="1" href="/export/tenant-statement.pdf?period=month">Export PDF</a>
+                        <a class="secondary" data-export="/export/tenant-statement.xlsx" data-tenant="1" href="/export/tenant-statement.xlsx?period=month">Export Excel</a>
+                    </div>
+                </div>
+                <div class="field" style="max-width:24rem;">
+                    <label for="statement-tenant">Tenant</label>
+                    <select id="statement-tenant">
+                        <option value="">All tenants in this period</option>
+                    </select>
+                </div>
+            </div>
         </section>
 
         <section data-view="settings" hidden>
             <div class="section">
                 <h2>Organisation</h2>
-                <p class="hint">These details are printed on invoices and the PDF. The email address is only printed. Sending mail stays locked.</p>
+                <p class="hint">These details are printed on invoices, tenant statements, and the other PDF and Excel exports. The email address is only printed. Sending mail stays locked.</p>
                 <form id="settings-form">
                     <div class="form-grid">
                         <div class="field"><label for="organisation-name">Company or trust name</label><input id="organisation-name" name="organisation_name" maxlength="160" autocomplete="organization" placeholder="Example Holdings"></div>

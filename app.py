@@ -17,6 +17,8 @@ import threading
 import uuid
 from dotenv import load_dotenv
 
+import exports
+
 load_dotenv()
 
 # Published placeholders are rejected so a fresh checkout cannot sign in
@@ -1226,11 +1228,114 @@ def invoice_pdf(invoice_id):
         return "Invoice not found", 404
     prop = find_item(data["properties"], invoice.get("property_id"))
     filename = (invoice.get("number") or "invoice").replace("/", "-") + ".pdf"
-    return send_file(
+    return send_download(
         build_invoice_pdf(invoice, prop, public_settings(data)),
-        mimetype="application/pdf",
+        filename,
+        "application/pdf",
+    )
+
+
+EXPORT_BUILDERS = {
+    ("profit-and-loss", "pdf"): exports.build_profit_and_loss_pdf,
+    ("profit-and-loss", "xlsx"): exports.build_profit_and_loss_xlsx,
+    ("rent-roll", "pdf"): exports.build_rent_roll_pdf,
+    ("rent-roll", "xlsx"): exports.build_rent_roll_xlsx,
+    ("transactions", "pdf"): exports.build_transactions_pdf,
+    ("transactions", "xlsx"): exports.build_transactions_xlsx,
+    ("invoices", "pdf"): exports.build_invoices_pdf,
+    ("invoices", "xlsx"): exports.build_invoices_xlsx,
+    ("tenant-statement", "pdf"): exports.build_tenant_statement_pdf,
+    ("tenant-statement", "xlsx"): exports.build_tenant_statement_xlsx,
+}
+XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def send_download(buffer, filename, mimetype):
+    buffer.seek(0)
+    response = send_file(
+        buffer,
+        mimetype=mimetype,
         as_attachment=True,
         download_name=filename,
+        max_age=0,
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+def export_bundle():
+    """Books for the period and property currently selected on the dashboard."""
+    bounds = request_period()
+    if bounds == "invalid":
+        return None
+    start, end = bounds
+    property_id = selected_property()
+    data = load_data()
+    names = {prop["id"]: prop.get("name") or "Property" for prop in data["properties"]}
+    chosen = data["properties"]
+    if property_id:
+        chosen = [prop for prop in chosen if prop["id"] == property_id]
+        match = find_item(data["properties"], property_id)
+        label = match["name"] if match else "Selected property"
+    else:
+        label = "All properties"
+    return {
+        "properties": chosen,
+        "income": filtered_rows(data["income"], start, end, property_id),
+        "expenses": filtered_rows(data["expenses"], start, end, property_id),
+        "invoices": filtered_rows(data["invoices"], start, end, property_id),
+        "all_income": list(data["income"]),
+        "all_invoices": list(data["invoices"]),
+        "names": names,
+        "start": start,
+        "end": end,
+        "property_label": label,
+        "org": public_settings(data),
+        "logo": find_logo(),
+        "generated": datetime.now().strftime("%Y-%m-%d"),
+        "tenant": clean(request.args.get("tenant", ""), 120),
+    }
+
+
+@app.route("/export/<slug>")
+@login_required
+@uses_data
+def export_report(slug):
+    # Free edition, including the public demo. Sign-in is the only gate.
+    if "." not in slug:
+        return jsonify({"error": "Choose PDF or Excel"}), 404
+    name, ext = slug.rsplit(".", 1)
+    ext = ext.lower()
+    builder = EXPORT_BUILDERS.get((name, ext))
+    if builder is None:
+        return jsonify({"error": "That export is not available"}), 404
+    bundle = export_bundle()
+    if bundle is None:
+        return jsonify({"error": "Choose a start date and an end date"}), 400
+    filename = exports.export_filename(name, ext, bundle)
+    mimetype = "application/pdf" if ext == "pdf" else XLSX_MIME
+    return send_download(builder(bundle), filename, mimetype)
+
+
+@app.route("/invoices/<invoice_id>/xlsx")
+@login_required
+@uses_data
+def invoice_xlsx(invoice_id):
+    data = load_data()
+    invoice = find_item(data["invoices"], invoice_id)
+    if invoice is None:
+        return "Invoice not found", 404
+    prop = find_item(data["properties"], invoice.get("property_id"))
+    filename = (invoice.get("number") or "invoice").replace("/", "-") + ".xlsx"
+    return send_download(
+        exports.build_invoice_xlsx(
+            invoice,
+            prop,
+            public_settings(data),
+            datetime.now().strftime("%Y-%m-%d"),
+        ),
+        filename,
+        XLSX_MIME,
     )
 
 

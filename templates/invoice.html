@@ -70,6 +70,7 @@
         <div class="actions">
             <button type="button" class="print" onclick="window.print()">Print</button>
             <a class="print" href="/invoices/{{ invoice.id }}/pdf">Download PDF</a>
+            <a class="print" href="/invoices/{{ invoice.id }}/xlsx">Export Excel</a>
             <button type="button" class="locked" onclick="alert('{{ premium_message }}')">Email invoice</button>
             <a class="back" href="/">Back</a>
         </div>

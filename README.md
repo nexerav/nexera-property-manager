@@ -12,7 +12,7 @@
 
 ## Why this exists
 
-Most rental software is built for agencies and charges per unit per month. If you own one to ten units, you usually end up with a spreadsheet, a folder of PDFs and a WhatsApp thread. This is the tool we wanted for that: one login, one data file, proper invoices and a clear picture of what each unit earns. It was built for South African landlords (rand, recoveries for water and electricity, body-corporate costs) but works anywhere.
+Most rental software is built for agencies and charges per unit per month. If you own one to ten units, you usually end up with a spreadsheet, a folder of PDFs and a WhatsApp thread. This is the tool we wanted for that: one login, one data file, proper invoices, PDF and Excel exports, and a clear picture of what each unit earns. It was built for South African landlords (rand, recoveries for water and electricity, body-corporate costs) but works anywhere.
 
 ## Quick start (Docker, about 2 minutes)
 
@@ -39,6 +39,7 @@ Open http://127.0.0.1:5000 and sign in as `admin` (or your `APP_USERNAME`) with 
 |---|---|---|
 | Properties, income, expenses, recoveries | ✅ | ✅ |
 | Invoices with PDF download and your logo | ✅ | ✅ |
+| PDF and Excel exports (profit and loss, rent roll, tenant statements, invoices, transactions) | ✅ | ✅ |
 | Dashboard (month, year, all time, custom) | ✅ | ✅ |
 | Maintenance requests → expenses | ✅ | ✅ |
 | Email invoices, WhatsApp, automated reminders | – | ✅ |
@@ -47,6 +48,27 @@ Open http://127.0.0.1:5000 and sign in as `admin` (or your `APP_USERNAME`) with 
 | We host it for you | – | ✅ |
 
 The free edition does not phone home and never needs a paid account. Interested in Premium? Join the waitlist at [nexerav.com](https://www.nexerav.com) or email info@nexerav.com.
+
+## Exports
+
+Signed-in users can download the books they would hand to an accountant, to SARS, or to a tenant. The buttons are on the page the report belongs to, and they follow the period and property selected in the toolbar. Amounts are in rand. PDFs use the organisation name, contact details, and logo from Settings. Excel files use the same headings and a rand number format, so a total still calculates.
+
+| Report | Page | What it contains |
+|---|---|---|
+| Profit and loss | Overview | Income split into rent, recoveries, and other; expenses by the category you entered (bond interest stays separate from bond capital); per-property totals; the transactions behind them |
+| Rent roll | Properties | Each unit, the current tenant, expected monthly rent, and income, expenses, and net for the period |
+| Transactions | Money | Income and expenses for the period, with a signed amount in Excel |
+| Invoices | Invoices | Register and line items for the period. Each invoice also has its own PDF and Excel file |
+| Tenant statement | Invoices | Invoices as charges, recorded income as payments, and a running balance. One tenant, or every tenant in the period |
+
+These exports are part of the free edition. There is no feature flag and no premium lock. The public demo at [demo.nexerav.com](https://demo.nexerav.com) includes them after you sign in with the demo login.
+
+To update a server that is already running, including the demo, pull this version and rebuild. The data folder is left as it is:
+
+```bash
+git pull
+docker compose up -d --build
+```
 
 ## Security
 
@@ -63,7 +85,7 @@ CI runs the tests plus a gitleaks secrets scan on every push and PR.
 
 ## Tech
 
-Python 3.11 · Flask · gunicorn (1 worker) · JSON file storage · ReportLab PDFs · Chart.js (bundled, MIT) · Docker.
+Python 3.11 · Flask · gunicorn (1 worker) · JSON file storage · ReportLab PDFs · openpyxl Excel · Chart.js (bundled, MIT) · Docker.
 
 ## Contributing
 
