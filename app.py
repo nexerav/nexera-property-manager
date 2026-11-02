@@ -19,7 +19,9 @@ import uuid
 from dotenv import load_dotenv
 
 import auth
+import demo_data
 import exports
+import labels
 
 load_dotenv()
 
@@ -53,7 +55,27 @@ def debug_requested():
     return os.environ.get("FLASK_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def waitlist_url():
+    raw = (os.environ.get("WAITLIST_URL") or "https://www.nexerav.com").strip()
+    if raw.startswith("https://") or raw.startswith("http://"):
+        return raw
+    return "https://www.nexerav.com"
+
+
+def brand_context():
+    return {
+        "premium_message": PREMIUM_DESCRIPTION,
+        "premium_description": PREMIUM_DESCRIPTION,
+        "waitlist_url": waitlist_url(),
+        "demo_mode": auth.demo_mode(),
+        "expense_choices": labels.EXPENSE_CHOICES,
+        "category_aliases": labels.LEGACY_CATEGORIES,
+    }
+
+
 app = Flask(__name__)
+app.jinja_env.filters["zar"] = labels.format_zar
+app.jinja_env.filters["qty"] = labels.format_qty
 app.secret_key = require_setting("SECRET_KEY", os.environ.get("SECRET_KEY"), INSECURE_SECRET_KEYS)
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -63,17 +85,17 @@ DATA_FILE = os.environ.get("DATA_FILE", os.path.join("data", "rental_data.json")
 VALID_USERNAME = (os.environ.get("APP_USERNAME") or "admin").strip() or "admin"
 VALID_PASSWORD = require_setting("APP_PASSWORD", os.environ.get("APP_PASSWORD"), INSECURE_PASSWORDS)
 
-PREMIUM_MESSAGE = "Premium feature – contact Nexera Ventures"
+PREMIUM_DESCRIPTION = (
+    "Premium adds instant invoicing, invoices emailed straight from the platform, "
+    "a property deal pipeline, and AI agents that handle the admin."
+)
 PREMIUM_FEATURES = [
-    "Email sending",
-    "WhatsApp messages",
-    "Automated reminders",
-    "Full Property Pipeline",
-    "Advanced charts",
-    "OCR bill scanning",
-    "Multi-user roles",
-    "Automated backups",
+    "Instant invoicing",
+    "Invoices emailed from the platform",
+    "Property deal pipeline",
+    "AI agents for the admin",
 ]
+PREMIUM_MESSAGE = PREMIUM_DESCRIPTION
 
 PROPERTY_KINDS = ["Residential", "Commercial", "Overhead"]
 INCOME_TYPES = ["Rent", "Recovery", "Other"]
@@ -87,24 +109,7 @@ RECOVERY_CATEGORIES = [
     "Carport",
     "Other Utility",
 ]
-EXPENSE_CATEGORIES = [
-    "Utilities",
-    "Rates",
-    "Refuse",
-    "Maintenance",
-    "Insurance",
-    "Repairs",
-    "Managing Agent Fees",
-    "Accountant Fees",
-    "Consulting Fees",
-    "Bond Interest (Tax Deductible)",
-    "Bond Capital Payment (Equity - Not Deductible)",
-    "Technology & Systems",
-    "Travel – Property Operations",
-    "Transfer & Bond Registration – Capital Costs",
-    "Other Banking Expenses",
-    "Other",
-]
+EXPENSE_CATEGORIES = [name for name, _help in labels.EXPENSE_CHOICES]
 INVOICE_STATUSES = ["Draft", "Issued"]
 LOGO_NAMES = ("logo.png", "logo.jpg", "logo.jpeg", "logo.gif", "logo.webp")
 TEXT_SETTINGS = {
@@ -552,6 +557,10 @@ def request_period():
         return start.isoformat(), end.isoformat()
     if period == "year":
         return f"{today.year}-01-01", f"{today.year}-12-31"
+    if period == "last12":
+        end = today
+        start = end - timedelta(days=365)
+        return start.isoformat(), end.isoformat()
     if period == "custom":
         start = request.args.get("start", "")
         end = request.args.get("end", "")
@@ -755,10 +764,10 @@ def dashboard():
     brand = page_brand()
     return render_template(
         "dashboard.html",
-        premium_message=PREMIUM_MESSAGE,
         logo=brand["logo"],
         organisation_name=brand["organisation_name"],
         allow_password_change=reset_allowed(),
+        **brand_context(),
     )
 
 
@@ -817,7 +826,7 @@ def api_summary():
 
     categories = {}
     for row in expense_rows:
-        label = row.get("category") or "Other"
+        label = labels.category_label(row.get("category") or "Other")
         categories[label] = round(categories.get(label, 0) + row["amount"], 2)
     by_category = [
         {"category": label, "amount": amount}
@@ -1022,7 +1031,12 @@ def api_expenses():
         if bounds == "invalid":
             return jsonify({"error": "Choose a start date and an end date"}), 400
         start, end = bounds
-        return jsonify(filtered_rows(data["expenses"], start, end, selected_property()))
+        rows = []
+        for row in filtered_rows(data["expenses"], start, end, selected_property()):
+            shown = dict(row)
+            shown["category"] = labels.category_label(shown.get("category"))
+            rows.append(shown)
+        return jsonify(rows)
 
     body = payload()
     fields, error = read_transaction(body)
@@ -1339,7 +1353,7 @@ def invoice_page(invoice_id):
         prop=prop,
         logo=bool(find_logo()),
         org=public_settings(data),
-        premium_message=PREMIUM_MESSAGE,
+        **brand_context(),
     )
 
 
@@ -1555,9 +1569,44 @@ def api_password():
 @login_required
 def premium_info():
     return jsonify({
-        "message": PREMIUM_MESSAGE,
+        "message": PREMIUM_DESCRIPTION,
+        "description": PREMIUM_DESCRIPTION,
         "features": PREMIUM_FEATURES,
+        "waitlist_url": waitlist_url(),
     })
+
+
+def ensure_demo_story():
+    """Fill a demo that has no rent with a fictional year of books.
+
+    A file that already has rent is left alone, so a customised demo is not wiped.
+    Settings and the password hash are kept.
+    """
+    if not auth.demo_mode():
+        return
+    if os.path.exists(DATA_FILE):
+        try:
+            data = load_data()
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
+            data = seed_data()
+    else:
+        data = seed_data()
+    if data.get("demo_seed") == demo_data.DEMO_SEED_VERSION:
+        return
+    rents = [
+        row for row in data.get("income") or []
+        if (row.get("income_type") or "Rent") == "Rent" and row.get("amount")
+    ]
+    if rents:
+        return
+    story = demo_data.build_demo_story(datetime.now().date())
+    story["settings"] = data.get("settings") if isinstance(data.get("settings"), dict) else empty_settings()
+    story["auth"] = data.get("auth") if isinstance(data.get("auth"), dict) else {}
+    story["demo_seed"] = demo_data.DEMO_SEED_VERSION
+    save_data(story)
+
+
+ensure_demo_story()
 
 
 def main():

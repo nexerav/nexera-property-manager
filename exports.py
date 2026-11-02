@@ -22,6 +22,8 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, PageBreak, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from labels import category_label, format_qty
+
 
 NAVY = "1A365D"
 INK = "1A202C"
@@ -124,9 +126,7 @@ def pdf_money(value):
 
 
 def format_quantity(value):
-    if value in (None, ""):
-        return ""
-    return f"{float(value):,.2f}"
+    return format_qty(value)
 
 
 def property_name(bundle, property_id):
@@ -163,7 +163,7 @@ def summarise(bundle):
         recoveries[label] = round(recoveries.get(label, 0) + _round(row.get("amount")), 2)
     categories = {}
     for row in expenses:
-        label = (row.get("category") or "").strip() or "Other"
+        label = category_label(row.get("category") or "Other")
         categories[label] = round(categories.get(label, 0) + _round(row.get("amount")), 2)
 
     by_property = []
@@ -215,7 +215,7 @@ def transaction_rows(bundle):
             "date": row.get("date") or "",
             "property": property_name(bundle, row.get("property_id")),
             "direction": "Expense",
-            "type": (row.get("category") or "").strip() or "Other",
+            "type": category_label(row.get("category") or "Other"),
             "party": (row.get("vendor") or "").strip(),
             "description": (row.get("description") or "").strip(),
             "amount": amount,

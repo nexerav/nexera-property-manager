@@ -49,6 +49,8 @@ If you set `SMTP_HOST`, `SMTP_FROM`, and `PASSWORD_RESET_EMAIL`, the sign-in pag
 
 The public demo must not be reset by a visitor. Set `DEMO_MODE=1` on that host. A username of `demo` also refuses a browser reset unless you set `ALLOW_PASSWORD_RESET=1` on a private install that really uses that username.
 
+With `DEMO_MODE=1`, a data file that has no rent is filled with fictional sample books for the last year, so the dashboard is not an empty month. A file that already has rent is left as it is. Settings and the password hash are kept. To show the sample story again, remove `demo_seed` from the data file (or replace the file) and start the app. The dashboard opens on the last 12 months.
+
 ## Screenshots
 
 | Overview | Money | Invoices | Settings |
@@ -64,12 +66,10 @@ The public demo must not be reset by a visitor. Set `DEMO_MODE=1` on that host. 
 | PDF and Excel exports (profit and loss, rent roll, tenant statements, invoices, transactions) | ✅ | ✅ |
 | Dashboard (month, year, all time, custom) | ✅ | ✅ |
 | Maintenance requests → expenses | ✅ | ✅ |
-| Email invoices, WhatsApp, automated reminders | – | ✅ |
-| OCR bill scanning, advanced charts, property pipeline | – | ✅ |
-| Multiple users and roles, automated backups | – | ✅ |
+| Premium | The free edition is complete for keeping your own books | Premium adds instant invoicing, invoices emailed straight from the platform, a property deal pipeline, and AI agents that handle the admin. |
 | We host it for you | – | ✅ |
 
-The free edition does not phone home and never needs a paid account. Interested in Premium? Join the waitlist at [nexerav.com](https://www.nexerav.com) or email info@nexerav.com.
+The free edition does not phone home and never needs a paid account. Premium adds instant invoicing, invoices emailed straight from the platform, a property deal pipeline, and AI agents that handle the admin. Join the waitlist at [nexerav.com](https://www.nexerav.com). The link is `WAITLIST_URL` (default `https://www.nexerav.com`). There is no third-party tracking in this app.
 
 ## Exports
 

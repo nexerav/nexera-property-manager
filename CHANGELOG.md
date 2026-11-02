@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.3.0
+
+### Demo and screen polish
+
+- A public demo (`DEMO_MODE=1`) with no rent recorded is filled with fictional sample books for the last year: rent, ordinary recoveries, and expenses across the sample units, plus overhead that is not a unit. A file that already has rent is not replaced. Settings and the password hash stay. Restart after pulling this version; if the demo still shows only the old electricity recovery, the file had no rent and will be replaced on startup.
+- The dashboard opens on the last 12 months, so a new visitor is not looking at an empty current month.
+- Delete asks you to confirm on the button itself, and the delete control sits apart from Edit.
+- Money is `R 8,500.00` on screen, on invoices, and in PDF and Excel. Whole quantities show as `1`, not `1.0`.
+- Invoice dates stay on one line.
+- The invoice note says "this server" on the demo and "this computer" when you run it yourself.
+- Expense categories use plain names. Older names such as "Bond Capital Payment (Equity - Not Deductible)" still load and are shown as "Bond capital payment", with the tax note as help text.
+- Company Expenses is grouped as overhead, not a property.
+- Premium controls are marked Premium and are not styled as ordinary buttons. The description is: "Premium adds instant invoicing, invoices emailed straight from the platform, a property deal pipeline, and AI agents that handle the admin." Join the waitlist uses `WAITLIST_URL`, which defaults to https://www.nexerav.com. The free edition is unchanged.
+
+Redeploy the demo with `DEMO_MODE=1` already set:
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+No new secret is required. Set `WAITLIST_URL` only if the waitlist should open somewhere other than https://www.nexerav.com.
+
 ## 1.2.0
 
 ### PDF and Excel exports

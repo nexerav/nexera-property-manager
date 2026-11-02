@@ -21,4 +21,5 @@ services:
       - SMTP_TLS=${SMTP_TLS:-}
       - PASSWORD_RESET_EMAIL=${PASSWORD_RESET_EMAIL:-}
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
+      - WAITLIST_URL=${WAITLIST_URL:-https://www.nexerav.com}
     restart: unless-stopped
