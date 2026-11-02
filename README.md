@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="static/img/nexera-logo.png" alt="Nexera Ventures" width="120" height="120">
+</p>
+
 # Nexera Property Manager
 
 **Free, self-hosted rental books for small landlords. Rent, expenses, invoices and maintenance on your own computer, with no account and no monthly fee.**

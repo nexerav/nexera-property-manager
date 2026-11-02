@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.0
+
+- The header, the sign-in page, the favicon, and the top of the README use the same crystal N as [nexerav.com](https://www.nexerav.com).
+
 ## 1.4.0
 
 ### QA fixes

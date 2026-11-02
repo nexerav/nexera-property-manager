@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Login - Nexera Property Manager</title>
-    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="/static/img/nexera-logo.png" type="image/png">
     <link rel="icon" href="/favicon.ico" sizes="32x32">
     <style>
         body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f5f7fa; }
@@ -20,6 +20,7 @@
 </head>
 <body>
     <div class="box">
+        <img class="brand-mark" src="/static/img/nexera-logo.png" alt="Nexera">
         {% if logo %}<img src="/logo" alt="">{% endif %}
         {% if organisation_name %}<p style="text-align:center; color:#1a365d; font-weight:650; margin:0 0 0.35rem;">{{ organisation_name }}</p>{% endif %}
         <h1>Nexera Property Manager</h1>

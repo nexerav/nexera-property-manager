@@ -288,7 +288,8 @@ td.num, th.num { text-align: right; white-space: nowrap; }
 
 td.invoice-no, th.invoice-no { white-space: nowrap; }
 .brand { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-.brand img, .logo-row img { height: 36px; width: auto; max-width: 140px; object-fit: contain; background: white; border-radius: 4px; }
+.brand .brand-mark { height: 40px; width: 40px; object-fit: contain; background: transparent; border-radius: 6px; }
+.brand img[data-logo], .logo-row img { height: 36px; width: auto; max-width: 140px; object-fit: contain; background: white; border-radius: 4px; }
 .org-name { font-size: 0.82rem; opacity: 0.9; }
 .logo-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
 .logo-row img { height: 64px; max-width: 180px; }
