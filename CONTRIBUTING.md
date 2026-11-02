@@ -17,7 +17,7 @@ Do not include real tenant names, property addresses, phone numbers, bank detail
 
 1. Fork the repository and create a branch.
 2. Keep the free edition useful. Do not hide an existing free feature behind the premium message.
-3. Paid features stay visible and locked, with the message `Premium feature – contact Nexera Ventures`.
+3. Paid features stay visible and locked. The Premium description is: "Premium adds instant invoicing, invoices emailed straight from the platform, a property deal pipeline, and AI agents that handle the admin." The free edition stays fully usable.
 4. Keep new sample data generic. Do not add real people, real properties, or client names.
 5. Run `python3 -m unittest tests.test_app -v`.
 6. Open a pull request that explains the change.

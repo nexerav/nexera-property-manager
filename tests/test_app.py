@@ -116,10 +116,18 @@ class PropertyAppTest(unittest.TestCase):
         self.assertIn(b"Common Property Electricity", page.data)
         self.assertIn(b"fine-print", page.data)
         self.assertNotIn(b"Open Source", page.data)
-        self.assertIn("Premium feature – contact Nexera Ventures".encode(), page.data)
-        self.assertIn(b"Advanced charts", page.data)
+        self.assertIn(pm.PREMIUM_DESCRIPTION.encode(), page.data)
+        self.assertIn(b"Join the waitlist", page.data)
+        self.assertIn(b"https://www.nexerav.com", page.data)
+        self.assertIn(b"premium-tag", page.data)
+        self.assertIn(b"stored on this computer", page.data)
+        self.assertIn(b"not a property", page.data)
+        self.assertIn(b'value="last12" selected', page.data)
+        self.assertNotIn(b"OCR bill scanning", page.data)
+        self.assertNotIn(b"Advanced charts", page.data)
         premium = self.client.get("/premium")
-        self.assertEqual(premium.get_json()["message"], "Premium feature – contact Nexera Ventures")
+        self.assertEqual(premium.get_json()["message"], pm.PREMIUM_DESCRIPTION)
+        self.assertEqual(premium.get_json()["waitlist_url"], "https://www.nexerav.com")
 
     def test_edit_income_expense_and_custom_category(self):
         prop = self.add_property()
@@ -288,7 +296,10 @@ class PropertyAppTest(unittest.TestCase):
         self.assertIn(b"Email invoice", page.data)
         self.assertIn(b"Download PDF", page.data)
         self.assertNotIn(b"mailto:", page.data)
-        self.assertIn(b"8350.00", page.data)
+        self.assertIn(b"R 8,350.00", page.data)
+        self.assertIn(b"R 8,000.00", page.data)
+        self.assertNotIn(b">1.0<", page.data)
+        self.assertIn(b">1<", page.data)
 
     def test_logo_upload(self):
         png = base64.b64decode(
@@ -360,16 +371,16 @@ class PropertyAppTest(unittest.TestCase):
 
         page = self.client.get("/")
         expected_links = [
-            "/export/profit-and-loss.pdf?period=month",
-            "/export/profit-and-loss.xlsx?period=month",
-            "/export/rent-roll.pdf?period=month",
-            "/export/rent-roll.xlsx?period=month",
-            "/export/transactions.pdf?period=month",
-            "/export/transactions.xlsx?period=month",
-            "/export/invoices.pdf?period=month",
-            "/export/invoices.xlsx?period=month",
-            "/export/tenant-statement.pdf?period=month",
-            "/export/tenant-statement.xlsx?period=month",
+            "/export/profit-and-loss.pdf?period=last12",
+            "/export/profit-and-loss.xlsx?period=last12",
+            "/export/rent-roll.pdf?period=last12",
+            "/export/rent-roll.xlsx?period=last12",
+            "/export/transactions.pdf?period=last12",
+            "/export/transactions.xlsx?period=last12",
+            "/export/invoices.pdf?period=last12",
+            "/export/invoices.xlsx?period=last12",
+            "/export/tenant-statement.pdf?period=last12",
+            "/export/tenant-statement.xlsx?period=last12",
         ]
         for link in expected_links:
             self.assertIn(link.encode(), page.data)
@@ -499,7 +510,7 @@ class PropertyAppTest(unittest.TestCase):
             b"6,500.00",
             b"11,650.00",
             b"3,200.00",
-            b"Bond Interest (Tax Deductible)",
+            b"Bond interest",
             b"Water",
             b"October rent",
             b"2026-10-01 to 2026-10-31",
@@ -511,7 +522,8 @@ class PropertyAppTest(unittest.TestCase):
         self.assertEqual(pl_book.sheetnames, ["Profit and loss", "By property", "Transactions"])
         pl_values = sheet_values(pl_book)
         self.assertIn("Example Holdings", pl_values)
-        self.assertTrue(has_text(pl_values, "Bond Interest (Tax Deductible)"))
+        self.assertTrue(has_text(pl_values, "Bond interest"))
+        self.assertFalse(has_text(pl_values, "Bond Interest (Tax Deductible)"))
         self.assertTrue(has_text(pl_values, "Water"))
         self.assertIn(11650, pl_values)
         self.assertIn(3200, pl_values)
@@ -936,6 +948,116 @@ print("demo-ok")
         )
         self.assertEqual(result.returncode, 0, msg=result.stderr)
         self.assertIn("demo-ok", result.stdout)
+
+    def test_last_year_plain_categories_and_demo_seed(self):
+        prop = self.add_property()
+        self.client.post("/api/income", json={
+            "property_id": prop["id"],
+            "amount": 100,
+            "date": "2026-05-01",
+            "income_type": "Rent",
+            "description": "May rent",
+        })
+        self.client.post("/api/income", json={
+            "property_id": prop["id"],
+            "amount": 9999,
+            "date": "2024-01-01",
+            "income_type": "Rent",
+            "description": "Old rent",
+        })
+        summary = self.client.get("/api/summary?period=last12").get_json()
+        self.assertEqual(summary["income"], 100)
+        self.assertEqual(summary["period"]["start"], "2025-10-30")
+        self.assertEqual(summary["period"]["end"], "2026-10-30")
+        self.client.post("/api/expenses", json={
+            "property_id": prop["id"],
+            "amount": 50,
+            "date": "2026-05-02",
+            "category": "Bond Capital Payment (Equity - Not Deductible)",
+            "description": "Capital",
+        })
+        listed = self.client.get("/api/expenses?period=last12").get_json()
+        self.assertEqual(listed[0]["category"], "Bond capital payment")
+        categories = self.client.get("/api/summary?period=last12").get_json()["by_category"]
+        self.assertEqual(categories[0]["category"], "Bond capital payment")
+        script = self.client.get("/static/js/app.js")
+        self.assertIn(b"Confirm delete", script.data)
+        self.assertEqual(pm.labels.format_zar(8500), "R 8,500.00")
+        self.assertEqual(pm.labels.format_qty(1.0), "1")
+        self.assertEqual(pm.labels.format_qty(1.5), "1.50")
+
+        folder = tempfile.mkdtemp()
+        path = os.path.join(folder, "rental_data.json")
+        with open(path, "w") as handle:
+            json.dump({
+                "properties": [{"id": "1", "name": "Unit A", "kind": "Residential"}],
+                "income": [{
+                    "id": "x",
+                    "property_id": "1",
+                    "amount": 20000,
+                    "date": "2026-08-01",
+                    "income_type": "Recovery",
+                    "recovery_category": "Electricity",
+                    "description": "Electricity",
+                    "tenant": "",
+                }],
+                "expenses": [],
+                "maintenance": [],
+                "invoices": [],
+                "settings": {"organisation_name": "Keep Me"},
+                "auth": {"password_hash": "stay"},
+            }, handle)
+        old_file = pm.DATA_FILE
+        os.environ["DEMO_MODE"] = "1"
+        pm.DATA_FILE = path
+        try:
+            pm.ensure_demo_story()
+            with open(path) as handle:
+                saved = json.load(handle)
+            self.assertEqual(saved["settings"]["organisation_name"], "Keep Me")
+            self.assertEqual(saved["auth"]["password_hash"], "stay")
+            rents = [row for row in saved["income"] if row.get("income_type") == "Rent"]
+            self.assertGreaterEqual(len(rents), 24)
+            self.assertGreaterEqual(len({row["date"][:7] for row in rents}), 8)
+            self.assertEqual(saved["demo_seed"], 1)
+            self.assertTrue(any(row.get("name") == "Company Expenses" and row.get("kind") == "Overhead" for row in saved["properties"]))
+            pm.ensure_demo_story()
+            with open(path) as handle:
+                again = json.load(handle)
+            self.assertEqual(len(again["income"]), len(saved["income"]))
+        finally:
+            os.environ.pop("DEMO_MODE", None)
+            pm.DATA_FILE = old_file
+
+        kept = os.path.join(folder, "kept.json")
+        with open(kept, "w") as handle:
+            json.dump({
+                "properties": [{"id": "1", "name": "Real Unit", "kind": "Residential"}],
+                "income": [{
+                    "id": "rent",
+                    "property_id": "1",
+                    "amount": 500,
+                    "date": "2026-06-01",
+                    "income_type": "Rent",
+                    "description": "Rent",
+                    "tenant": "A. Tenant",
+                }],
+                "expenses": [],
+                "maintenance": [],
+                "invoices": [],
+            }, handle)
+        os.environ["DEMO_MODE"] = "1"
+        pm.DATA_FILE = kept
+        try:
+            pm.ensure_demo_story()
+            with open(kept) as handle:
+                untouched = json.load(handle)
+            self.assertEqual(untouched["income"][0]["amount"], 500)
+            self.assertNotIn("demo_seed", untouched)
+        finally:
+            os.environ.pop("DEMO_MODE", None)
+            pm.DATA_FILE = old_file
+
 
 def has_text(values, snippet):
     return any(snippet in str(value) for value in values)

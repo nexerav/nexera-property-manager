@@ -17,7 +17,8 @@
         button { font: inherit; padding: 0.5rem 0.8rem; border-radius: 4px; border: none; cursor: pointer; }
         .print { background: #2b6cb0; color: white; text-decoration: none; display: inline-block; }
         .muted { color: #4a5568; white-space: pre-line; }
-        .locked { background: #a0aec0; color: white; }
+        .locked { background: #edf2f7; color: #4a5568; border: 1px dashed #a0aec0; cursor: not-allowed; text-decoration: none; display: inline-block; }
+        .premium-tag { display: inline-block; margin-left: 0.35rem; padding: 0.05rem 0.4rem; border-radius: 999px; background: #e2e8f0; color: #2d3748; font-size: 0.68rem; letter-spacing: 0.03em; text-transform: uppercase; }
         .back { background: white; color: #1a365d; border: 1px solid #cbd5e0; text-decoration: none; padding: 0.5rem 0.8rem; border-radius: 4px; }
         @media print { .actions { display: none; } body { background: white; } .sheet { margin: 0; } }
     </style>
@@ -55,14 +56,14 @@
                 {% for item in invoice.line_items %}
                 <tr>
                     <td>{{ item.description }}</td>
-                    <td class="num">{{ item.quantity }}</td>
-                    <td class="num">R {{ "%.2f"|format(item.unit_price) }}</td>
-                    <td class="num">R {{ "%.2f"|format(item.amount) }}</td>
+                    <td class="num">{{ item.quantity|qty }}</td>
+                    <td class="num">{{ item.unit_price|zar }}</td>
+                    <td class="num">{{ item.amount|zar }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
             <tfoot>
-                <tr><th colspan="3" class="num">Total</th><th class="num">R {{ "%.2f"|format(invoice.total) }}</th></tr>
+                <tr><th colspan="3" class="num">Total</th><th class="num">{{ invoice.total|zar }}</th></tr>
             </tfoot>
         </table>
         {% if invoice.notes %}<p class="muted">{{ invoice.notes }}</p>{% endif %}
@@ -71,7 +72,7 @@
             <button type="button" class="print" onclick="window.print()">Print</button>
             <a class="print" href="/invoices/{{ invoice.id }}/pdf">Download PDF</a>
             <a class="print" href="/invoices/{{ invoice.id }}/xlsx">Export Excel</a>
-            <button type="button" class="locked" onclick="alert('{{ premium_message }}')">Email invoice</button>
+            <a class="locked" href="{{ waitlist_url }}" rel="noopener noreferrer" title="{{ premium_description }}">Email invoice <span class="premium-tag">Premium</span></a>
             <a class="back" href="/">Back</a>
         </div>
     </article>

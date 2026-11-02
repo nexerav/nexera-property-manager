@@ -6,7 +6,7 @@
     <title>Nexera Property Manager</title>
     <link rel="stylesheet" href="/static/css/app.css">
 </head>
-<body>
+<body data-premium="{{ premium_description }}" data-waitlist="{{ waitlist_url }}">
     <header>
         <div class="header-row">
             <div class="brand">
@@ -25,8 +25,8 @@
             <button type="button" data-tab="invoices">Invoices</button>
             <button type="button" data-tab="maintenance">Maintenance<span id="job-count"></span></button>
             <button type="button" data-tab="settings">Settings</button>
-            <button type="button" class="locked-tab" onclick="showPremium()">Property Pipeline</button>
-            <button type="button" class="locked-tab" onclick="showPremium()">Email</button>
+            <button type="button" class="locked-tab" title="{{ premium_description }}" onclick="showPremium()">Property pipeline <span class="premium-tag">Premium</span></button>
+            <button type="button" class="locked-tab" title="{{ premium_description }}" onclick="showPremium()">Email invoices <span class="premium-tag">Premium</span></button>
         </nav>
     </header>
     <main class="container">
@@ -35,7 +35,8 @@
             <div class="field">
                 <label for="period">Period</label>
                 <select id="period">
-                    <option value="month" selected>This month</option>
+                    <option value="last12" selected>Last 12 months</option>
+                    <option value="month">This month</option>
                     <option value="year">This year</option>
                     <option value="all">All time</option>
                     <option value="custom">Custom dates</option>
@@ -64,8 +65,8 @@
                         <p class="hint">Income and expenses for the period and property selected above, in rand. This is the report to hand to an accountant.</p>
                     </div>
                     <div class="export-bar">
-                        <a class="secondary" data-export="/export/profit-and-loss.pdf" href="/export/profit-and-loss.pdf?period=month">Export PDF</a>
-                        <a class="secondary" data-export="/export/profit-and-loss.xlsx" href="/export/profit-and-loss.xlsx?period=month">Export Excel</a>
+                        <a class="secondary" data-export="/export/profit-and-loss.pdf" href="/export/profit-and-loss.pdf?period=last12">Export PDF</a>
+                        <a class="secondary" data-export="/export/profit-and-loss.xlsx" href="/export/profit-and-loss.xlsx?period=last12">Export Excel</a>
                     </div>
                 </div>
             </div>
@@ -119,11 +120,11 @@
                 <div class="section-head">
                     <div>
                         <h2>Rent roll</h2>
-                        <p class="hint">Units, the current tenant, and income, expenses, and net for the period selected above. Use Company Expenses for overhead that is not tied to one unit.</p>
+                        <p class="hint">Units are listed on their own. Company Expenses is overhead, not a property.</p>
                     </div>
                     <div class="export-bar">
-                        <a class="secondary" data-export="/export/rent-roll.pdf" href="/export/rent-roll.pdf?period=month">Export PDF</a>
-                        <a class="secondary" data-export="/export/rent-roll.xlsx" href="/export/rent-roll.xlsx?period=month">Export Excel</a>
+                        <a class="secondary" data-export="/export/rent-roll.pdf" href="/export/rent-roll.pdf?period=last12">Export PDF</a>
+                        <a class="secondary" data-export="/export/rent-roll.xlsx" href="/export/rent-roll.xlsx?period=last12">Export Excel</a>
                     </div>
                 </div>
                 <div class="table-wrap">
@@ -189,23 +190,11 @@
                         <div class="field">
                             <label for="expense-category">Category</label>
                             <select id="expense-category" name="category">
-                                <option>Utilities</option>
-                                <option>Rates</option>
-                                <option>Refuse</option>
-                                <option>Maintenance</option>
-                                <option>Insurance</option>
-                                <option>Repairs</option>
-                                <option>Managing Agent Fees</option>
-                                <option>Accountant Fees</option>
-                                <option>Consulting Fees</option>
-                                <option>Bond Interest (Tax Deductible)</option>
-                                <option>Bond Capital Payment (Equity - Not Deductible)</option>
-                                <option>Technology &amp; Systems</option>
-                                <option>Travel – Property Operations</option>
-                                <option>Transfer &amp; Bond Registration – Capital Costs</option>
-                                <option>Other Banking Expenses</option>
-                                <option>Other</option>
+                                {% for name, help in expense_choices %}
+                                <option value="{{ name }}" {% if help %}data-help="{{ help }}"{% endif %}>{{ name }}</option>
+                                {% endfor %}
                             </select>
+                            <p id="category-help" class="hint"></p>
                         </div>
                         <div class="field"><label for="expense-custom">Or your own category</label><input id="expense-custom" name="category_custom" maxlength="80" placeholder="Leave blank to use the list"></div>
                         <div class="field"><label for="expense-vendor">Vendor</label><input id="expense-vendor" name="vendor" maxlength="120" placeholder="Optional"></div>
@@ -224,14 +213,14 @@
                         <p class="hint">Income and expenses for the period and property selected above.</p>
                     </div>
                     <div class="export-bar">
-                        <a class="secondary" data-export="/export/transactions.pdf" href="/export/transactions.pdf?period=month">Export PDF</a>
-                        <a class="secondary" data-export="/export/transactions.xlsx" href="/export/transactions.xlsx?period=month">Export Excel</a>
+                        <a class="secondary" data-export="/export/transactions.pdf" href="/export/transactions.pdf?period=last12">Export PDF</a>
+                        <a class="secondary" data-export="/export/transactions.xlsx" href="/export/transactions.xlsx?period=last12">Export Excel</a>
                     </div>
                 </div>
                 <div class="table-wrap">
                     <table id="money-table">
                         <thead>
-                            <tr><th>Date</th><th>Property</th><th>Type</th><th>Details</th><th class="num">Amount</th><th></th></tr>
+                            <tr><th class="date">Date</th><th>Property</th><th>Type</th><th>Details</th><th class="num">Amount</th><th></th></tr>
                         </thead>
                         <tbody></tbody>
                     </table>
@@ -288,7 +277,6 @@
                     <div class="actions-row" style="margin-top:0.8rem;">
                         <button type="submit" data-label="Log request">Log request</button>
                         <button type="button" class="secondary" id="maint-cancel" data-cancel hidden>Cancel</button>
-                        <button type="button" class="locked" onclick="showPremium()">Email the contractor</button>
                     </div>
                 </form>
             </div>
@@ -308,7 +296,7 @@
                 <div class="table-wrap">
                     <table id="maint-table">
                         <thead>
-                            <tr><th>Date</th><th>Property</th><th>Issue</th><th>Description</th><th>Status</th><th class="num">Cost</th><th></th></tr>
+                            <tr><th class="date">Date</th><th>Property</th><th>Issue</th><th>Description</th><th>Status</th><th class="num">Cost</th><th></th></tr>
                         </thead>
                         <tbody></tbody>
                     </table>
@@ -319,7 +307,7 @@
         <section data-view="invoices" hidden>
             <div class="section">
                 <h2>Create an invoice</h2>
-                <p class="hint">Invoices are stored on this computer. Use View, Download PDF, or Edit on a saved invoice. Sending them by email is locked.</p>
+                <p class="hint">Invoices are stored on this {{ "server" if demo_mode else "computer" }}. Use View, Download PDF, or Edit on a saved invoice. Emailing them from here is not in the free edition.</p>
                 <form id="invoice-form">
                     <p class="edit-flag" hidden></p>
                     <div class="form-grid">
@@ -354,7 +342,7 @@
                     <div class="actions-row" style="margin-top:0.8rem;">
                         <button type="submit" data-label="Save invoice">Save invoice</button>
                         <button type="button" class="secondary" id="invoice-cancel" data-cancel hidden>Cancel</button>
-                        <button type="button" class="locked" onclick="showPremium()">Email invoice</button>
+                        <a class="locked" href="{{ waitlist_url }}" rel="noopener noreferrer" title="{{ premium_description }}">Email invoice <span class="premium-tag">Premium</span></a>
                     </div>
                 </form>
             </div>
@@ -365,14 +353,14 @@
                         <p class="hint">Export PDF and Export Excel download the register for the period selected above. The table below keeps every invoice for the selected property. Each invoice also has its own PDF and Excel file.</p>
                     </div>
                     <div class="export-bar">
-                        <a class="secondary" data-export="/export/invoices.pdf" href="/export/invoices.pdf?period=month">Export PDF</a>
-                        <a class="secondary" data-export="/export/invoices.xlsx" href="/export/invoices.xlsx?period=month">Export Excel</a>
+                        <a class="secondary" data-export="/export/invoices.pdf" href="/export/invoices.pdf?period=last12">Export PDF</a>
+                        <a class="secondary" data-export="/export/invoices.xlsx" href="/export/invoices.xlsx?period=last12">Export Excel</a>
                     </div>
                 </div>
                 <div class="table-wrap">
                     <table id="invoice-table">
                         <thead>
-                            <tr><th>Number</th><th>Date</th><th>Property</th><th>Tenant</th><th>Status</th><th class="num">Total</th><th></th></tr>
+                            <tr><th>Number</th><th class="date">Date</th><th>Property</th><th>Tenant</th><th>Status</th><th class="num">Total</th><th></th></tr>
                         </thead>
                         <tbody></tbody>
                     </table>
@@ -385,8 +373,8 @@
                         <p class="hint">Invoices are charges and income recorded against the tenant is payments, for the period and property selected above. Hand this to a tenant, or keep it with the books.</p>
                     </div>
                     <div class="export-bar">
-                        <a class="secondary" data-export="/export/tenant-statement.pdf" data-tenant="1" href="/export/tenant-statement.pdf?period=month">Export PDF</a>
-                        <a class="secondary" data-export="/export/tenant-statement.xlsx" data-tenant="1" href="/export/tenant-statement.xlsx?period=month">Export Excel</a>
+                        <a class="secondary" data-export="/export/tenant-statement.pdf" data-tenant="1" href="/export/tenant-statement.pdf?period=last12">Export PDF</a>
+                        <a class="secondary" data-export="/export/tenant-statement.xlsx" data-tenant="1" href="/export/tenant-statement.xlsx?period=last12">Export Excel</a>
                     </div>
                 </div>
                 <div class="field" style="max-width:24rem;">
@@ -447,19 +435,16 @@
         </section>
 
         <section class="section premium-foot">
-            <h2>Premium features</h2>
+            <h2>Premium</h2>
+            <p class="fine-print">{{ premium_description }}</p>
             <div class="premium-list">
-                <button type="button" class="locked" onclick="showPremium()">Send invoice by email</button>
-                <button type="button" class="locked" onclick="showPremium()">WhatsApp messages</button>
-                <button type="button" class="locked" onclick="showPremium()">Automated reminders</button>
-                <button type="button" class="locked" onclick="showPremium()">Property Pipeline</button>
-                <button type="button" class="locked" onclick="showPremium()">Advanced charts</button>
-                <button type="button" class="locked" onclick="showPremium()">OCR bill scanning</button>
-                <button type="button" class="locked" onclick="showPremium()">Multi-user roles</button>
-                <button type="button" class="locked" onclick="showPremium()">Automated backups</button>
+                {% for feature in ["Instant invoicing", "Invoices emailed from the platform", "Property deal pipeline", "AI agents for the admin"] %}
+                <span class="locked" title="{{ premium_description }}">{{ feature }} <span class="premium-tag">Premium</span></span>
+                {% endfor %}
             </div>
-            <p class="fine-print">Free open-source edition by <strong>Nexera Ventures</strong>. Email, WhatsApp, automated reminders, the Property Pipeline, advanced charts, OCR, multi-user roles, and automated backups stay locked. Premium feature – contact Nexera Ventures</p>
+            <p class="fine-print"><a class="waitlist" href="{{ waitlist_url }}" rel="noopener noreferrer">Join the waitlist</a></p>
         </section>
+        <script id="category-aliases" type="application/json">{{ category_aliases|tojson }}</script>
     </main>
     <script src="/static/js/chart.umd.min.js"></script>
     <script src="/static/js/app.js"></script>

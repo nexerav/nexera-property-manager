@@ -69,7 +69,7 @@ header small { opacity: 0.8; font-weight: 500; }
     font-weight: 650;
 }
 
-.tabs button.locked-tab { color: rgba(255, 255, 255, 0.55); }
+.tabs button.locked-tab { color: rgba(255, 255, 255, 0.55); cursor: not-allowed; }
 
 .container { max-width: 1100px; margin: 0 auto; padding: 1.25rem; }
 
@@ -127,7 +127,7 @@ button, .btn {
 button:hover, .btn:hover { background: var(--blue-dark); }
 button.secondary:hover, button.ghost:hover { background: #edf2f7; }
 button.danger:hover { background: #9b2c2c; }
-button.locked:hover { background: #718096; }
+button.locked:hover, a.locked:hover, span.locked:hover { background: #edf2f7; }
 button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 button.secondary, button.ghost {
@@ -139,9 +139,59 @@ button.secondary, button.ghost {
 button.danger { background: var(--red); }
 button.small { padding: 0.3rem 0.55rem; font-size: 0.85rem; }
 
-button.locked, .locked {
-    background: #a0aec0;
-    cursor: pointer;
+button.locked, a.locked, span.locked, .locked {
+    background: #edf2f7;
+    color: #4a5568;
+    border: 1px dashed #a0aec0;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.premium-tag {
+    display: inline-block;
+    margin-left: 0.35rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    background: #e2e8f0;
+    color: #2d3748;
+    font-size: 0.68rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+.locked-tab .premium-tag {
+    background: rgba(255, 255, 255, 0.16);
+    color: white;
+}
+
+a.waitlist {
+    display: inline-block;
+    margin-top: 0.35rem;
+    padding: 0.45rem 0.8rem;
+    background: var(--blue);
+    color: white;
+    border-radius: 4px;
+    text-decoration: none;
+}
+
+a.waitlist:hover { background: var(--blue-dark); }
+
+.group-label {
+    background: #f7fafc;
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 650;
+}
+
+td.date, th.date { white-space: nowrap; }
+
+.row-actions .danger { margin-left: 0.85rem; }
+
+button.danger[data-armed="1"] {
+    background: white;
+    color: var(--red);
+    border: 2px solid var(--red);
 }
 
 .cards {

@@ -1,7 +1,17 @@
-const premiumMessage = "Premium feature – contact Nexera Ventures";
+const premiumDescription = document.body.dataset.premium || "";
+const waitlistUrl = document.body.dataset.waitlist || "https://www.nexerav.com";
+const categoryAliases = (() => {
+    const node = document.getElementById("category-aliases");
+    if (!node) return {};
+    try {
+        return JSON.parse(node.textContent || "{}");
+    } catch (error) {
+        return {};
+    }
+})();
 
 const state = {
-    period: "month",
+    period: "last12",
     start: "",
     end: "",
     propertyId: "",
@@ -33,11 +43,22 @@ function esc(value) {
 }
 
 function money(value) {
-    const amount = Number(value) || 0;
-    return "R " + amount.toLocaleString("en-ZA", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    });
+    const amount = Number(value);
+    const number = Number.isFinite(amount) ? amount : 0;
+    const formatted = Math.abs(number).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return (number < 0 ? "R -" : "R ") + formatted;
+}
+
+function wholeQty(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return "";
+    if (Math.abs(number - Math.round(number)) < 0.001) return String(Math.round(number));
+    return number.toFixed(2);
+}
+
+function plainCategory(value) {
+    const text = String(value || "").trim();
+    return categoryAliases[text] || text || "Other";
 }
 
 function today() {
@@ -60,8 +81,7 @@ function notice(message, isError) {
 }
 
 function showPremium() {
-    notice(premiumMessage, true);
-    window.alert(premiumMessage);
+    notice(premiumDescription);
 }
 
 async function api(url, options) {
@@ -180,31 +200,45 @@ function renderSummary() {
         : `<tr><td colspan="2" class="empty">No expenses in this period.</td></tr>`;
 }
 
+function isOverhead(prop) {
+    return prop.kind === "Overhead" || prop.name === "Company Expenses";
+}
+
+function propertyRow(prop, totals) {
+    const totalsRow = totals[prop.id] || { income: 0, expenses: 0, net: 0 };
+    const rent = prop.monthly_rent == null || prop.monthly_rent === "" ? "—" : money(prop.monthly_rent);
+    const kind = isOverhead(prop) ? "Not a unit" : (prop.kind || "");
+    return `<tr>
+        <td>${esc(prop.name)}<div class="hint">${esc(prop.notes || "")}</div></td>
+        <td>${esc(kind)}</td>
+        <td>${esc(prop.address || "")}</td>
+        <td class="num">${rent}</td>
+        <td class="num">${money(totalsRow.income)}</td>
+        <td class="num">${money(totalsRow.expenses)}</td>
+        <td class="num">${money(totalsRow.net)}</td>
+        <td class="row-actions">
+            <button type="button" class="small secondary" data-action="edit-property" data-id="${esc(prop.id)}">Edit</button>
+            <button type="button" class="small secondary" data-action="focus-property" data-id="${esc(prop.id)}">Money</button>
+            <button type="button" class="small danger" data-action="delete-property" data-id="${esc(prop.id)}">Delete</button>
+        </td>
+    </tr>`;
+}
+
 function renderProperties() {
     const totals = Object.fromEntries((state.summary?.by_property || []).map((row) => [row.id, row]));
     const body = document.querySelector("#property-table tbody");
     if (!state.properties.length) {
-        body.innerHTML = `<tr><td colspan="7" class="empty">No properties yet. Add a unit, or keep Company Expenses for overhead.</td></tr>`;
+        body.innerHTML = `<tr><td colspan="8" class="empty">No properties yet. Add a unit, or keep Company Expenses for overhead that is not a property.</td></tr>`;
         return;
     }
-    body.innerHTML = state.properties.map((prop) => {
-        const totalsRow = totals[prop.id] || { income: 0, expenses: 0, net: 0 };
-        const rent = prop.monthly_rent == null || prop.monthly_rent === "" ? "—" : money(prop.monthly_rent);
-        return `<tr>
-            <td>${esc(prop.name)}<div class="hint">${esc(prop.notes || "")}</div></td>
-            <td>${esc(prop.kind || "")}</td>
-            <td>${esc(prop.address || "")}</td>
-            <td class="num">${rent}</td>
-            <td class="num">${money(totalsRow.income)}</td>
-            <td class="num">${money(totalsRow.expenses)}</td>
-            <td class="num">${money(totalsRow.net)}</td>
-            <td class="row-actions">
-                <button type="button" class="small secondary" data-action="edit-property" data-id="${esc(prop.id)}">Edit</button>
-                <button type="button" class="small secondary" data-action="focus-property" data-id="${esc(prop.id)}">Money</button>
-                <button type="button" class="small danger" data-action="delete-property" data-id="${esc(prop.id)}">Delete</button>
-            </td>
-        </tr>`;
-    }).join("");
+    const units = state.properties.filter((prop) => !isOverhead(prop));
+    const overhead = state.properties.filter(isOverhead);
+    let html = units.map((prop) => propertyRow(prop, totals)).join("");
+    if (overhead.length) {
+        html += `<tr><td colspan="8" class="group-label">Not a property. Overhead for the whole portfolio.</td></tr>`;
+        html += overhead.map((prop) => propertyRow(prop, totals)).join("");
+    }
+    body.innerHTML = html;
 }
 
 function detailText(entry, kind) {
@@ -214,7 +248,7 @@ function detailText(entry, kind) {
         if (entry.recovery_category) parts.push(entry.recovery_category);
         if (entry.tenant) parts.push(entry.tenant);
     } else {
-        parts.push(entry.category || "Other");
+        parts.push(plainCategory(entry.category || "Other"));
         if (entry.vendor) parts.push(entry.vendor);
     }
     if (entry.description) parts.push(entry.description);
@@ -229,7 +263,7 @@ function renderMoney() {
     const body = document.querySelector("#money-table tbody");
     body.innerHTML = rows.length
         ? rows.map((entry) => `<tr>
-            <td>${esc(entry.date)}</td>
+            <td class="date">${esc(entry.date)}</td>
             <td>${esc(propertyName(entry.property_id))}</td>
             <td>${entry.kind === "income" ? "Income" : "Expense"}</td>
             <td>${esc(detailText(entry, entry.kind))}</td>
@@ -255,7 +289,7 @@ function renderMaintenance() {
             const copied = entry.expense_id ? "In expenses" : "Copy to expenses";
             const cost = entry.cost == null || entry.cost === "" ? "—" : money(entry.cost);
             return `<tr>
-                <td>${esc(entry.date)}</td>
+                <td class="date">${esc(entry.date)}</td>
                 <td>${esc(propertyName(entry.property_id))}</td>
                 <td>${esc(entry.issue_type)}<div class="hint">${esc(entry.urgency)}</div></td>
                 <td>${esc(entry.description)}${entry.tenant_name ? `<div class="hint">${esc(entry.tenant_name)}</div>` : ""}</td>
@@ -281,7 +315,7 @@ function renderInvoices() {
     body.innerHTML = state.invoices.length
         ? state.invoices.map((invoice) => `<tr>
             <td>${esc(invoice.number)}</td>
-            <td>${esc(invoice.date)}</td>
+            <td class="date">${esc(invoice.date)}</td>
             <td>${esc(propertyName(invoice.property_id))}</td>
             <td>${esc(invoice.tenant)}</td>
             <td>${esc(invoice.status)}</td>
@@ -565,7 +599,20 @@ document.getElementById("expense-form").addEventListener("submit", async (event)
 
 document.getElementById("expense-cancel").addEventListener("click", () => {
     resetForm(document.getElementById("expense-form"), "expenseEdit");
+    showCategoryHelp();
 });
+
+function showCategoryHelp() {
+    const select = document.getElementById("expense-category");
+    const help = document.getElementById("category-help");
+    if (!select || !help) return;
+    const option = select.options[select.selectedIndex];
+    help.textContent = option && option.dataset.help ? option.dataset.help : "";
+}
+
+const expenseCategory = document.getElementById("expense-category");
+if (expenseCategory) expenseCategory.addEventListener("change", showCategoryHelp);
+showCategoryHelp();
 
 document.getElementById("maint-form").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -604,6 +651,15 @@ document.body.addEventListener("click", async (event) => {
     if (!button || button.disabled) return;
     const id = button.dataset.id;
     const action = button.dataset.action;
+    if (action.startsWith("delete-") && button.dataset.armed !== "1") {
+        document.querySelectorAll("button.danger[data-armed='1']").forEach((other) => {
+            other.dataset.armed = "";
+            other.textContent = "Delete";
+        });
+        button.dataset.armed = "1";
+        button.textContent = "Confirm delete";
+        return;
+    }
     try {
         if (action === "edit-property") {
             const prop = state.properties.find((item) => item.id === id);
@@ -623,8 +679,6 @@ document.body.addEventListener("click", async (event) => {
         }
         if (action === "delete-property") {
             const prop = state.properties.find((item) => item.id === id);
-            const ok = window.confirm(`Delete ${prop.name}? This also removes every income, expense, invoice, and maintenance record linked to it, including records outside the current period.`);
-            if (!ok) return;
             await api("/api/properties/" + id, { method: "DELETE" });
             if (state.propertyId === id) state.propertyId = "";
             notice("Property deleted.");
@@ -644,18 +698,19 @@ document.body.addEventListener("click", async (event) => {
         if (action === "edit-expense") {
             const entry = state.expenses.find((item) => item.id === id);
             const form = document.getElementById("expense-form");
+            const plain = plainCategory(entry.category);
             state.expenseEdit = id;
             assign(form, entry);
-            const known = [...form.elements.category.options].some((option) => option.value === entry.category);
-            form.elements.category.value = known ? entry.category : "Other";
-            form.elements.category_custom.value = known ? "" : entry.category;
+            const known = [...form.elements.category.options].some((option) => option.value === plain);
+            form.elements.category.value = known ? plain : "Other";
+            form.elements.category_custom.value = known ? "" : plain;
+            showCategoryHelp();
             setEditFlag(form, "Editing expense");
             showView("money");
             return;
         }
         if (action === "delete-income" || action === "delete-expense") {
             const label = action === "delete-income" ? "income" : "expense";
-            if (!window.confirm("Delete this " + label + " record?")) return;
             await api("/api/" + (label === "income" ? "income/" : "expenses/") + id, { method: "DELETE" });
             notice("Deleted.");
             await refresh();
@@ -671,7 +726,6 @@ document.body.addEventListener("click", async (event) => {
             return;
         }
         if (action === "delete-maintenance") {
-            if (!window.confirm("Delete this maintenance request?")) return;
             await api("/api/maintenance/" + id, { method: "DELETE" });
             notice("Deleted.");
             await refresh();
@@ -697,7 +751,6 @@ document.body.addEventListener("click", async (event) => {
             return;
         }
         if (action === "delete-invoice") {
-            if (!window.confirm("Delete this invoice?")) return;
             await api("/api/invoices/" + id, { method: "DELETE" });
             if (state.invoiceEdit === id) resetInvoice();
             notice("Deleted.");
@@ -744,7 +797,7 @@ function updateInvoiceTotal() {
 function addInvoiceLine(line = {}) {
     const row = document.createElement("div");
     row.className = "invoice-line";
-    const qty = line.quantity == null || line.quantity === "" ? 1 : line.quantity;
+    const qty = line.quantity == null || line.quantity === "" ? 1 : wholeQty(line.quantity);
     const price = line.unit_price == null || line.unit_price === "" ? "" : line.unit_price;
     row.innerHTML = `
         <div class="field"><label>Description</label><input data-desc maxlength="200" list="invoice-item-names" value="${esc(line.description || "")}" placeholder="Monthly rent"></div>
