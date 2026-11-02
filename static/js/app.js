@@ -289,11 +289,45 @@ function renderInvoices() {
             <td class="row-actions">
                 <a class="small secondary" href="/invoices/${esc(invoice.id)}" target="_blank" rel="noopener">View</a>
                 <a class="small secondary" href="/invoices/${esc(invoice.id)}/pdf">Download PDF</a>
+                <a class="small secondary" href="/invoices/${esc(invoice.id)}/xlsx">Export Excel</a>
                 <button type="button" class="small secondary" data-action="edit-invoice" data-id="${esc(invoice.id)}">Edit</button>
                 <button type="button" class="small danger" data-action="delete-invoice" data-id="${esc(invoice.id)}">Delete</button>
             </td>
         </tr>`).join("")
         : `<tr><td colspan="7" class="empty">No invoices yet.</td></tr>`;
+}
+
+function renderTenantOptions() {
+    const select = document.getElementById("statement-tenant");
+    if (!select) return;
+    const current = select.value;
+    const names = new Map();
+    const add = (value) => {
+        const name = String(value || "").trim();
+        if (!name) return;
+        const key = name.toLocaleLowerCase();
+        if (!names.has(key)) names.set(key, name);
+    };
+    state.income.forEach((row) => add(row.tenant));
+    state.invoices.forEach((row) => add(row.tenant));
+    const options = ['<option value="">All tenants in this period</option>'];
+    [...names.values()].sort((a, b) => a.localeCompare(b)).forEach((name) => {
+        options.push(`<option value="${esc(name)}">${esc(name)}</option>`);
+    });
+    select.innerHTML = options.join("");
+    if ([...select.options].some((option) => option.value === current)) {
+        select.value = current;
+    }
+}
+
+function refreshExportLinks() {
+    const tenantField = document.getElementById("statement-tenant");
+    const tenant = tenantField ? tenantField.value : "";
+    document.querySelectorAll("a[data-export]").forEach((link) => {
+        const params = new URLSearchParams(query());
+        if (link.dataset.tenant === "1" && tenant) params.set("tenant", tenant);
+        link.href = link.dataset.export + "?" + params.toString();
+    });
 }
 
 function render() {
@@ -303,6 +337,8 @@ function render() {
     renderMoney();
     renderMaintenance();
     renderInvoices();
+    renderTenantOptions();
+    refreshExportLinks();
 }
 
 function maintenanceQuery() {
@@ -774,6 +810,9 @@ document.getElementById("invoice-form").addEventListener("submit", async (event)
 });
 
 document.getElementById("invoice-cancel").addEventListener("click", resetInvoice);
+
+const statementTenant = document.getElementById("statement-tenant");
+if (statementTenant) statementTenant.addEventListener("change", refreshExportLinks);
 
 function showLogo() {
     const images = [...document.querySelectorAll("[data-logo]")];
