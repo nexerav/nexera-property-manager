@@ -22,7 +22,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, PageBreak, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from labels import category_label, format_qty
+from labels import category_label, format_qty, format_zar
 
 
 NAVY = "1A365D"
@@ -33,7 +33,8 @@ ZEBRA = "F7FAFC"
 TOTAL = "EBF8FF"
 GREEN = "276749"
 RED = "C53030"
-MONEY_FORMAT = '"R "#,##0.00;"R -"#,##0.00'
+# Locale 409 is English (US), so Excel shows a comma and a dot, not the viewer's local separators.
+MONEY_FORMAT = '[$-409]"R "#,##0.00;[$-409]-"R "#,##0.00'
 QTY_FORMAT = "#,##0.##"
 
 # Helvetica covers Latin-1. Map the punctuation the books already store.
@@ -122,7 +123,7 @@ def pdf_paragraph(text, style):
 
 
 def pdf_money(value):
-    return "R " + f"{float(value or 0):,.2f}"
+    return format_zar(value)
 
 
 def format_quantity(value):

@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Nexera Property Manager</title>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="/favicon.ico" sizes="32x32">
     <link rel="stylesheet" href="/static/css/app.css">
 </head>
 <body data-premium="{{ premium_description }}" data-waitlist="{{ waitlist_url }}">
@@ -320,6 +322,9 @@
                             <select id="invoice-status" name="status">
                                 <option>Draft</option>
                                 <option>Issued</option>
+                                <option>Outstanding</option>
+                                <option>Overdue</option>
+                                <option>Paid</option>
                             </select>
                         </div>
                         <div class="field grow"><label for="invoice-notes">Notes</label><textarea id="invoice-notes" name="notes" placeholder="Optional note on the invoice"></textarea></div>
@@ -360,7 +365,7 @@
                 <div class="table-wrap">
                     <table id="invoice-table">
                         <thead>
-                            <tr><th>Number</th><th class="date">Date</th><th>Property</th><th>Tenant</th><th>Status</th><th class="num">Total</th><th></th></tr>
+                            <tr><th class="invoice-no">Number</th><th class="date">Date</th><th>Property</th><th>Tenant</th><th>Status</th><th class="num">Total</th><th></th></tr>
                         </thead>
                         <tbody></tbody>
                     </table>
@@ -446,6 +451,7 @@
         </section>
         <script id="category-aliases" type="application/json">{{ category_aliases|tojson }}</script>
     </main>
+    <script src="/static/js/format.js"></script>
     <script src="/static/js/chart.umd.min.js"></script>
     <script src="/static/js/app.js"></script>
 </body>

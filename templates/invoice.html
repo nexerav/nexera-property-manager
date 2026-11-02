@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ invoice.number }}</title>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="/favicon.ico" sizes="32x32">
     <style>
         body { font-family: system-ui, sans-serif; color: #1a202c; margin: 0; background: #f5f7fa; }
         .sheet { max-width: 800px; margin: 1.5rem auto; background: white; padding: 2rem; border-radius: 8px; }
@@ -12,11 +14,12 @@
         h1 { margin: 0; color: #1a365d; font-size: 1.4rem; }
         table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; }
         th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #e2e8f0; }
-        .num { text-align: right; }
+        .num, .invoice-no { text-align: right; white-space: nowrap; }
+        .invoice-no { text-align: left; }
         .actions { margin-top: 1.5rem; display: flex; gap: 0.5rem; }
         button { font: inherit; padding: 0.5rem 0.8rem; border-radius: 4px; border: none; cursor: pointer; }
         .print { background: #2b6cb0; color: white; text-decoration: none; display: inline-block; }
-        .muted { color: #4a5568; white-space: pre-line; }
+        .muted { color: #2d3748; white-space: pre-line; }
         .locked { background: #edf2f7; color: #4a5568; border: 1px dashed #a0aec0; cursor: not-allowed; text-decoration: none; display: inline-block; }
         .premium-tag { display: inline-block; margin-left: 0.35rem; padding: 0.05rem 0.4rem; border-radius: 999px; background: #e2e8f0; color: #2d3748; font-size: 0.68rem; letter-spacing: 0.03em; text-transform: uppercase; }
         .back { background: white; color: #1a365d; border: 1px solid #cbd5e0; text-decoration: none; padding: 0.5rem 0.8rem; border-radius: 4px; }
@@ -38,7 +41,7 @@
                 </div>
             </div>
             <div>
-                <strong>{{ invoice.number }}</strong><br>
+                <strong class="invoice-no">{{ invoice.number }}</strong><br>
                 {{ invoice.status }}<br>
                 Date {{ invoice.date }}
                 {% if invoice.due_date %}<br>Due {{ invoice.due_date }}{% endif %}
