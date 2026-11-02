@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1.0
+## 1.2.0
 
 ### PDF and Excel exports
 
@@ -15,6 +15,20 @@ You can download the reports a landlord actually sends on. This is part of the f
 Each of those has **Export PDF** and **Export Excel** on the page it belongs to. PDFs use the organisation name, contact details, and logo from Settings, and amounts are formatted in rand (`R 1,234.00`). Excel workbooks use the same headings, a rand number format, a frozen header, and print to A4 landscape.
 
 The public demo can download the same files. There is no new environment variable. Redeploy with `docker compose up -d --build` so the image picks up `openpyxl`. The `data` volume is not replaced.
+
+## 1.1.0
+
+### Password reset
+
+You can get back in if you forget the password or the sign-in locks after too many tries.
+
+- Five wrong passwords lock sign-in for 15 minutes. The right password does not get through until the lock ends or you reset it.
+- From the computer that runs the app, `python3 app.py reset-password` asks for a new password. It does not take the password as an argument. With Docker, use `docker compose exec -it property-manager python app.py reset-password`.
+- Settings has a password change for when you are already signed in. It asks for the current password.
+- If `SMTP_HOST`, `SMTP_FROM`, and `PASSWORD_RESET_EMAIL` are set, Forgot password on the sign-in page emails a link. The link expires after 30 minutes and works once. The token is stored only as a hash. If mail is not set up, the page tells you to use the server command and does not invent a link.
+- A reset clears the lockout and any older reset link. The new password is a hash in the data file, so it still works after a restart.
+
+The public demo cannot be taken over with this. `DEMO_MODE=1` turns off the browser reset, the Settings change, and the reset command. A username of `demo` also refuses a browser reset unless that private install sets `ALLOW_PASSWORD_RESET=1`.
 
 ## 1.0.1
 

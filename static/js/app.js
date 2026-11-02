@@ -861,6 +861,29 @@ document.getElementById("logo-remove").addEventListener("click", async () => {
     }
 });
 
+const passwordForm = document.getElementById("password-form");
+if (passwordForm) {
+    passwordForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const values = formData(passwordForm);
+        try {
+            await api("/api/password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    current_password: values.current_password,
+                    new_password: values.new_password,
+                    confirm_password: values.confirm_password,
+                }),
+            });
+            passwordForm.reset();
+            notice("Password updated.");
+        } catch (error) {
+            notice(error.message, true);
+        }
+    });
+}
+
 document.getElementById("settings-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const values = formData(event.target);
