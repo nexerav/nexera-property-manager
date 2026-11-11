@@ -237,8 +237,13 @@ def serve(folder):
     The socket is bound with an address tuple. Looking the name up first can
     stall for a long time on some Macs, including GitHub's runners.
     """
+    import socket
     import socketserver
     from wsgiref.simple_server import WSGIRequestHandler, WSGIServer
+
+    # Reverse lookup of 127.0.0.1 can sit until DNS gives up. The page never
+    # opens on those machines, including GitHub's macOS runners.
+    socket.getfqdn = lambda *args, **kwargs: "127.0.0.1"
 
     # Imported after the environment is set, so the secret and data folder stick.
     import app as application
