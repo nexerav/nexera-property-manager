@@ -6,7 +6,7 @@
 
 The 1.5.0 Mac download could show "is damaged and can't be opened." The app was not damaged. The zip had replaced shortcuts inside the app with copies, and macOS refused to open it.
 
-Download 1.5.1 from the releases page. Unzip it, then right-click **Nexera Property Manager** and choose **Open**, then **Open** again. The sign-in page shows 1.5.1. The books in Documents stay where they are. You do not need a terminal.
+Download 1.5.1 from the releases page and unzip it. Double-click **Nexera Property Manager**. When Mac says Apple could not verify the app, click **Done**, then open **System Settings**, choose **Privacy & Security**, and click **Open Anyway**. On an older Mac, right-click the app and choose **Open**, then **Open**. The sign-in page shows 1.5.1. The books in Documents stay where they are. You do not need a terminal.
 
 ## 1.5.0
 
@@ -23,7 +23,7 @@ A landlord can download Nexera and open it. This path has no terminal, no Git, a
 - Docker and any other server install are unchanged. Those still need `SECRET_KEY` and `APP_PASSWORD`, and they do not show the first-run password page.
 - On Windows, `python app.py reset-password` stops and tells you what to do when it is not running in a console window. Set `APP_PASSWORD_RESET` for a script. The password is still not accepted as a command argument.
 
-The first time you open the download, Mac and Windows may ask you to confirm because the file is not from their store. Right-click and choose Open on a Mac. On Windows, choose More info, then Run anyway.
+The first time you open the download, Mac and Windows may ask you to confirm because the file is not from their store. On a current Mac, click Done on the warning, then Open Anyway under System Settings, Privacy & Security. On an older Mac, right-click and choose Open. On Windows, choose More info, then Run anyway.
 
 ## 1.4.0
 

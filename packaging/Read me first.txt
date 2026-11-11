@@ -1,6 +1,10 @@
 Nexera Property Manager
 
-1. Mac: right-click "Nexera Property Manager" and choose Open. Click Open again.
+1. Mac: double-click "Nexera Property Manager".
+   When Mac says Apple could not verify the app, click Done. Do not click Move to Bin.
+   Open the Apple menu, choose System Settings, then Privacy & Security.
+   Scroll to Security and click Open Anyway. Confirm if it asks.
+   On an older Mac, right-click the app and choose Open, then Open.
    If Mac says the app is damaged, download the latest version again from the same page.
    Windows: double-click "Nexera Property Manager". If Windows says it protected your PC, click More info, then Run anyway.
 
