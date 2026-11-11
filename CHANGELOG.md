@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.5.0
+
+### Install on your own computer
+
+A landlord can download Nexera and open it. This path has no terminal, no Git, and no settings file.
+
+- Mac and Windows downloads are attached to the GitHub release. The sign-in page shows the version number, and `/health` reports `1.5.0`.
+- The first page asks for a password. The app makes its own secret key. There is still no default password.
+- The books are saved in Documents/Nexera Property Manager. Copy that folder to keep a backup.
+- Forgot password on that install sets a new password in the browser. It only works on that computer.
+- The downloaded app listens only on that computer. It does not phone home.
+- Quit Nexera from the sign-in page before opening a newly downloaded copy. The books stay in the same folder.
+- Docker and any other server install are unchanged. Those still need `SECRET_KEY` and `APP_PASSWORD`, and they do not show the first-run password page.
+
+The first time you open the download, Mac and Windows may ask you to confirm because the file is not from their store. Right-click and choose Open on a Mac. On Windows, choose More info, then Run anyway.
+
 ## 1.4.0
 
 ### QA fixes

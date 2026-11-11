@@ -3,16 +3,21 @@ import io
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
+import urllib.error
+import urllib.request
 import zlib
 from datetime import datetime as RealDateTime
 
 from openpyxl import load_workbook
 
 import auth
+import desktop
 
 TEMP_DIR = tempfile.mkdtemp()
 DATA_FILE = os.path.join(TEMP_DIR, "rental_data.json")
@@ -36,6 +41,9 @@ pm.datetime = FixedDateTime
 
 class PropertyAppTest(unittest.TestCase):
     def setUp(self):
+        os.environ.pop("NEXERA_DESKTOP", None)
+        pm.VALID_PASSWORD = "unit-test-password"
+        pm._desktop_ready = False
         with open(DATA_FILE, "w") as handle:
             json.dump({
                 "properties": [],
@@ -84,6 +92,7 @@ class PropertyAppTest(unittest.TestCase):
             env[name] = bad
             env[other_name] = other_value
             env.pop("FLASK_DEBUG", None)
+            env.pop("NEXERA_DESKTOP", None)
             result = subprocess.run(
                 [sys.executable, "-c", "import app"],
                 cwd=root,
@@ -115,6 +124,7 @@ class PropertyAppTest(unittest.TestCase):
         self.assertNotIn(b"logo-file", header)
         self.assertIn(b"Common Property Electricity", page.data)
         self.assertIn(b"fine-print", page.data)
+        self.assertIn(b"Version 1.5.0", page.data)
         self.assertNotIn(b"Open Source", page.data)
         self.assertIn(pm.PREMIUM_DESCRIPTION.encode(), page.data)
         self.assertIn(b"Join the waitlist", page.data)
@@ -1081,6 +1091,225 @@ print("demo-ok")
         finally:
             os.environ.pop("DEMO_MODE", None)
             pm.DATA_FILE = old_file
+
+    def form_token(self, page):
+        match = re.search(br'name="form_token" value="([^"]+)"', page.data)
+        self.assertIsNotNone(match)
+        return match.group(1).decode("ascii")
+
+    def test_health_reports_the_release_version(self):
+        body = self.client.get("/health").get_json()
+        self.assertEqual(body["status"], "ok")
+        self.assertEqual(body["version"], "1.5.0")
+
+    def test_setup_is_hidden_on_a_server_install(self):
+        guest = pm.app.test_client()
+        self.assertEqual(guest.get("/setup").status_code, 404)
+        self.assertEqual(guest.get("/desktop-reset").status_code, 404)
+        self.assertEqual(guest.get("/quit").status_code, 404)
+        login = guest.get("/login")
+        self.assertIn(b"Version 1.5.0", login.data)
+        self.assertIn(b"/forgot-password", login.data)
+        self.assertNotIn(b"/desktop-reset", login.data)
+
+    def test_desktop_starts_without_a_bootstrap_password(self):
+        env = os.environ.copy()
+        env["NEXERA_DESKTOP"] = "1"
+        env["SECRET_KEY"] = "unit-test-secret"
+        env["DATA_FILE"] = DATA_FILE
+        env.pop("APP_PASSWORD", None)
+        env.pop("FLASK_DEBUG", None)
+        root = os.path.dirname(os.path.abspath(pm.__file__))
+        result = subprocess.run(
+            [sys.executable, "-c", "import app; print(repr(app.VALID_PASSWORD)); print(app.VERSION)"],
+            cwd=root,
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("None", result.stdout)
+        self.assertIn("1.5.0", result.stdout)
+
+    def test_desktop_setup_reset_and_quit_stay_on_this_computer(self):
+        saved = pm.VALID_PASSWORD
+        pm.VALID_PASSWORD = None
+        pm._desktop_ready = False
+        os.environ["NEXERA_DESKTOP"] = "1"
+        try:
+            guest = pm.app.test_client()
+            self.assertEqual(
+                guest.get("/setup", environ_overrides={"REMOTE_ADDR": "8.8.8.8"}).status_code,
+                404,
+            )
+            home = guest.get("/", follow_redirects=True)
+            self.assertIn(b"Choose a password", home.data)
+            self.assertIn(b"admin", home.data)
+            self.assertNotIn(b"python3", home.data)
+            missing = guest.post("/setup", data={
+                "password": "desktop-password",
+                "confirm": "desktop-password",
+            })
+            self.assertIn(b"This page expired", missing.data)
+            token = self.form_token(guest.get("/setup"))
+            mismatch = guest.post("/setup", data={
+                "form_token": token,
+                "password": "desktop-password",
+                "confirm": "desktop-other-pw",
+            })
+            self.assertIn(b"do not match", mismatch.data)
+            token = self.form_token(mismatch)
+            opened = guest.post(
+                "/setup",
+                data={
+                    "form_token": token,
+                    "password": "desktop-password",
+                    "confirm": "desktop-password",
+                },
+                follow_redirects=True,
+            )
+            self.assertEqual(opened.status_code, 200)
+            self.assertIn(b"This computer", opened.data)
+            self.assertIn(b"Version 1.5.0", opened.data)
+            with open(DATA_FILE) as handle:
+                stored = json.load(handle)
+            self.assertTrue(stored["auth"]["password_hash"])
+            self.assertNotIn("desktop-password", json.dumps(stored))
+
+            guest.get("/logout")
+            denied = guest.post("/login", data={"username": "admin", "password": "unit-test-password"})
+            self.assertIn(b"Invalid credentials", denied.data)
+            login = guest.get("/login")
+            self.assertIn(b"/desktop-reset", login.data)
+            self.assertNotIn(b"python3 app.py reset-password", login.data)
+
+            remote = guest.get("/desktop-reset", environ_overrides={"REMOTE_ADDR": "8.8.8.8"})
+            self.assertEqual(remote.status_code, 404)
+            reset_page = guest.get("/desktop-reset")
+            token = self.form_token(reset_page)
+            reset = guest.post(
+                "/desktop-reset",
+                data={
+                    "form_token": token,
+                    "password": "another-desktop-password",
+                    "confirm": "another-desktop-password",
+                },
+                follow_redirects=True,
+            )
+            self.assertIn(b"This computer", reset.data)
+            guest.get("/logout")
+            signed = guest.post(
+                "/login",
+                data={"username": "admin", "password": "another-desktop-password"},
+                follow_redirects=True,
+            )
+            self.assertIn(b"Change password", signed.data)
+
+            self.assertEqual(
+                guest.get("/quit", environ_overrides={"REMOTE_ADDR": "8.8.8.8"}).status_code,
+                404,
+            )
+            calls = []
+            original = pm.stop_process
+            pm.stop_process = lambda: calls.append("stop")
+            pm.QUIT_DELAY_SECONDS = 0
+            try:
+                quit_page = guest.get("/quit")
+                token = self.form_token(quit_page)
+                closed = guest.post("/quit", data={"form_token": token})
+                self.assertIn(b"Nexera has closed", closed.data)
+                deadline = time.time() + 2
+                while not calls and time.time() < deadline:
+                    time.sleep(0.02)
+                self.assertEqual(calls, ["stop"])
+            finally:
+                pm.stop_process = original
+                pm.QUIT_DELAY_SECONDS = 0.4
+        finally:
+            pm.VALID_PASSWORD = saved
+            pm._desktop_ready = False
+            os.environ.pop("NEXERA_DESKTOP", None)
+
+    def test_desktop_launcher_keeps_one_copy_and_its_own_secret(self):
+        folder = tempfile.mkdtemp()
+        saved = os.environ.get("NEXERA_DATA_DIR")
+        os.environ["NEXERA_DATA_DIR"] = folder
+        try:
+            self.assertEqual(desktop.choose_data_dir(), os.path.abspath(folder))
+            first = desktop.load_or_create_secret(folder)
+            second = desktop.load_or_create_secret(folder)
+            self.assertEqual(first, second)
+            self.assertGreaterEqual(len(first), 32)
+            mode = os.stat(os.path.join(folder, "secret_key")).st_mode
+            if os.name == "posix":
+                self.assertEqual(stat.S_IMODE(mode) & 0o077, 0)
+            self.assertTrue(desktop.claim_lock(folder))
+            self.assertFalse(desktop.claim_lock(folder))
+            desktop.release_lock(folder)
+            self.assertFalse(os.path.exists(os.path.join(folder, "nexera.lock")))
+            with open(os.path.join(folder, "nexera.lock"), "w") as handle:
+                handle.write("99999999")
+            self.assertTrue(desktop.claim_lock(folder))
+            desktop.release_lock(folder)
+            self.assertIsNone(desktop.running_url(folder))
+        finally:
+            if saved is None:
+                os.environ.pop("NEXERA_DATA_DIR", None)
+            else:
+                os.environ["NEXERA_DATA_DIR"] = saved
+
+    def test_double_click_opens_the_password_page(self):
+        folder = tempfile.mkdtemp()
+        env = os.environ.copy()
+        env["NEXERA_DATA_DIR"] = folder
+        env["NEXERA_NO_BROWSER"] = "1"
+        env.pop("FLASK_DEBUG", None)
+        root = os.path.dirname(os.path.abspath(pm.__file__))
+        proc = subprocess.Popen(
+            [sys.executable, os.path.join(root, "desktop.py")],
+            cwd=root,
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            base = None
+            deadline = time.time() + 25
+            while time.time() < deadline:
+                if proc.poll() is not None:
+                    error = proc.stderr.read()
+                    self.fail("desktop app stopped: " + error)
+                port_path = os.path.join(folder, "port")
+                if os.path.exists(port_path):
+                    with open(port_path, encoding="utf-8") as handle:
+                        port = handle.read().strip()
+                    base = "http://127.0.0.1:%s/" % port
+                    try:
+                        with urllib.request.urlopen(base + "health", timeout=1) as response:
+                            body = json.loads(response.read().decode("utf-8"))
+                        if body.get("version") == "1.5.0":
+                            break
+                    except (OSError, urllib.error.URLError, json.JSONDecodeError, ValueError):
+                        base = None
+                time.sleep(0.2)
+            else:
+                self.fail("desktop app did not answer")
+            with urllib.request.urlopen(base + "setup", timeout=5) as response:
+                page = response.read()
+            self.assertIn(b"Choose a password", page)
+            self.assertIn(b"Version 1.5.0", page)
+            self.assertNotIn(b"python3", page)
+            self.assertTrue(os.path.isfile(os.path.join(folder, "secret_key")))
+            with urllib.request.urlopen(base + "login", timeout=5) as response:
+                self.assertIn(b"Choose a password", response.read())
+        finally:
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
 
 
 def has_text(values, snippet):

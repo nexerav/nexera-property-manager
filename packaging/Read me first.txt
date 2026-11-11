@@ -1,0 +1,18 @@
+Nexera Property Manager
+
+1. Mac: right-click "Nexera Property Manager" and choose Open. Click Open again.
+   Windows: double-click "Nexera Property Manager". If Windows says it protected your PC, click More info, then Run anyway.
+
+2. Your browser opens. Choose a password. Your username is admin.
+
+3. Your books are saved in Documents, in the folder "Nexera Property Manager".
+   Copy that folder to a USB stick when you want a backup.
+
+Closing the browser does not delete your books. Open this app again to continue.
+
+Forgot the password? On the sign-in page, choose Forgot password and set a new one.
+You do not need to type any commands.
+
+The version number is on the sign-in page. New versions are on the same download page.
+Quit Nexera from the sign-in page before you open a newly downloaded copy.
+Your books stay in the Documents folder.

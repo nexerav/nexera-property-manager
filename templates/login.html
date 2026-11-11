@@ -16,6 +16,8 @@
         .error { color: #e53e3e; text-align: center; }
         .reset { text-align: center; margin: 0.9rem 0 0; font-size: 0.9rem; }
         .reset a { color: #2b6cb0; }
+        .quiet { color: #2d3748; font-size: 0.82rem; text-align: center; }
+        p { color: #1a202c; font-size: 0.92rem; line-height: 1.45; }
     </style>
 </head>
 <body>
@@ -23,15 +25,20 @@
         {% if logo %}<img src="/logo" alt="">{% endif %}
         {% if organisation_name %}<p style="text-align:center; color:#1a365d; font-weight:650; margin:0 0 0.35rem;">{{ organisation_name }}</p>{% endif %}
         <h1>Nexera Property Manager</h1>
+        {% if desktop_mode %}<p>Your username is <strong>{{ username }}</strong>.</p>{% endif %}
         {% if error %}<p class="error">{{ error }}</p>{% endif %}
         <form method="post">
             <input type="text" name="username" placeholder="Username" required>
             <input type="password" name="password" placeholder="Password" required>
             <button type="submit">Sign In</button>
         </form>
-        {% if show_reset %}
+        {% if desktop_reset %}
+        <p class="reset"><a href="/desktop-reset">Forgot password?</a></p>
+        {% elif show_reset %}
         <p class="reset"><a href="/forgot-password">Forgot password?</a></p>
         {% endif %}
+        {% if desktop_mode %}<p class="quiet"><a href="/quit">Quit Nexera</a></p>{% endif %}
+        <p class="quiet">Version {{ version }}</p>
     </div>
 </body>
 </html>

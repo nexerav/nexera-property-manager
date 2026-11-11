@@ -13,3 +13,6 @@ venv/
 *.log
 .idea/
 .vscode/
+build/
+dist/
+*.spec
