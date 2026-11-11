@@ -666,6 +666,7 @@ class PropertyAppTest(unittest.TestCase):
             capture_output=True,
             text=True,
             stdin=subprocess.DEVNULL,
+            timeout=20,
         )
 
     def test_password_can_be_changed_and_reset_from_the_server(self):
