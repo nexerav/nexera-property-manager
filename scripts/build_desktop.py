@@ -83,22 +83,58 @@ def build():
     return system
 
 
+def make_zip(folder, archive):
+    """Zip a finished download.
+
+    Python's zip follows a shortcut and stores a copy. A Mac app is full of
+    shortcuts. After that zip is opened, macOS says the app is damaged.
+    ditto keeps the shortcuts.
+    """
+    folder = Path(folder)
+    archive = Path(archive)
+    if archive.exists():
+        archive.unlink()
+    if platform.system() == "Darwin":
+        subprocess.run(
+            ["ditto", "-c", "-k", "--norsrc", str(folder), str(archive)],
+            check=True,
+        )
+        return
+    shutil.make_archive(str(archive.with_suffix("")), "zip", folder)
+
+
+def mac_zip_keeps_shortcuts(archive):
+    """True when the zip still contains at least one shortcut."""
+    import zipfile
+    with zipfile.ZipFile(archive) as handle:
+        for info in handle.infolist():
+            if ((info.external_attr >> 16) & 0o170000) == 0o120000:
+                return True
+    return False
+
+
 def package(system):
     if PACKAGE.exists():
         shutil.rmtree(PACKAGE)
     PACKAGE.mkdir(parents=True)
     shutil.copy(ROOT / "packaging" / "Read me first.txt", PACKAGE / "Read me first.txt")
     if system == "Darwin":
-        shutil.copytree(DIST / f"{NAME}.app", PACKAGE / f"{NAME}.app", symlinks=True)
+        app_path = PACKAGE / f"{NAME}.app"
+        shutil.copytree(DIST / f"{NAME}.app", app_path, symlinks=True)
+        # Copying the app clears the signature PyInstaller just wrote.
+        subprocess.run(
+            ["codesign", "--force", "--deep", "--sign", "-", str(app_path)],
+            check=True,
+        )
         zip_name = "Nexera-Property-Manager-mac.zip"
     else:
         shutil.copy(DIST / f"{NAME}.exe", PACKAGE / f"{NAME}.exe")
         zip_name = "Nexera-Property-Manager-windows.zip"
     DIST.mkdir(exist_ok=True)
     archive = DIST / zip_name
-    if archive.exists():
-        archive.unlink()
-    shutil.make_archive(str(archive.with_suffix("")), "zip", PACKAGE)
+    make_zip(PACKAGE, archive)
+    if system == "Darwin" and not mac_zip_keeps_shortcuts(archive):
+        sys.exit("The Mac zip dropped the shortcuts inside the app. macOS would call it damaged.")
     print(archive)
 
 

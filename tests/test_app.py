@@ -2,6 +2,7 @@ import base64
 import io
 import json
 import os
+import platform
 import re
 import stat
 import subprocess
@@ -19,6 +20,9 @@ from openpyxl import load_workbook
 
 import auth
 import desktop
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "scripts"))
+import build_desktop
 
 TEMP_DIR = tempfile.mkdtemp()
 DATA_FILE = os.path.join(TEMP_DIR, "rental_data.json")
@@ -125,7 +129,7 @@ class PropertyAppTest(unittest.TestCase):
         self.assertNotIn(b"logo-file", header)
         self.assertIn(b"Common Property Electricity", page.data)
         self.assertIn(b"fine-print", page.data)
-        self.assertIn(b"Version 1.5.0", page.data)
+        self.assertIn(("Version " + pm.VERSION).encode(), page.data)
         self.assertNotIn(b"Open Source", page.data)
         self.assertIn(pm.PREMIUM_DESCRIPTION.encode(), page.data)
         self.assertIn(b"Join the waitlist", page.data)
@@ -1102,7 +1106,7 @@ print("demo-ok")
     def test_health_reports_the_release_version(self):
         body = self.client.get("/health").get_json()
         self.assertEqual(body["status"], "ok")
-        self.assertEqual(body["version"], "1.5.0")
+        self.assertEqual(body["version"], pm.VERSION)
 
     def test_setup_is_hidden_on_a_server_install(self):
         guest = pm.app.test_client()
@@ -1110,7 +1114,7 @@ print("demo-ok")
         self.assertEqual(guest.get("/desktop-reset").status_code, 404)
         self.assertEqual(guest.get("/quit").status_code, 404)
         login = guest.get("/login")
-        self.assertIn(b"Version 1.5.0", login.data)
+        self.assertIn(("Version " + pm.VERSION).encode(), login.data)
         self.assertIn(b"/forgot-password", login.data)
         self.assertNotIn(b"/desktop-reset", login.data)
 
@@ -1131,7 +1135,7 @@ print("demo-ok")
         )
         self.assertEqual(result.returncode, 0, msg=result.stderr)
         self.assertIn("None", result.stdout)
-        self.assertIn("1.5.0", result.stdout)
+        self.assertIn(pm.VERSION, result.stdout)
 
     def test_desktop_setup_reset_and_quit_stay_on_this_computer(self):
         saved = pm.VALID_PASSWORD
@@ -1172,7 +1176,7 @@ print("demo-ok")
             )
             self.assertEqual(opened.status_code, 200)
             self.assertIn(b"This computer", opened.data)
-            self.assertIn(b"Version 1.5.0", opened.data)
+            self.assertIn(("Version " + pm.VERSION).encode(), opened.data)
             with open(DATA_FILE) as handle:
                 stored = json.load(handle)
             self.assertTrue(stored["auth"]["password_hash"])
@@ -1297,7 +1301,7 @@ print("demo-ok")
                     try:
                         with urllib.request.urlopen(base + "health", timeout=1) as response:
                             body = json.loads(response.read().decode("utf-8"))
-                        if body.get("version") == "1.5.0":
+                        if body.get("version") == pm.VERSION:
                             break
                     except (OSError, urllib.error.URLError, json.JSONDecodeError, ValueError):
                         base = None
@@ -1313,7 +1317,7 @@ print("demo-ok")
             with urllib.request.urlopen(base + "setup", timeout=5) as response:
                 page = response.read()
             self.assertIn(b"Choose a password", page)
-            self.assertIn(b"Version 1.5.0", page)
+            self.assertIn(("Version " + pm.VERSION).encode(), page)
             self.assertNotIn(b"python3", page)
             self.assertTrue(os.path.isfile(os.path.join(folder, "secret_key")))
             with urllib.request.urlopen(base + "login", timeout=5) as response:
@@ -1325,6 +1329,20 @@ print("demo-ok")
                     proc.wait(timeout=5)
                 except subprocess.TimeoutExpired:
                     proc.kill()
+
+    def test_mac_download_keeps_shortcuts_inside_the_app(self):
+        if platform.system() != "Darwin":
+            self.skipTest("The Mac download is built on macOS")
+        parent = tempfile.mkdtemp()
+        folder = os.path.join(parent, "pkg")
+        app_dir = os.path.join(folder, "Demo.app", "Contents")
+        os.makedirs(app_dir)
+        with open(os.path.join(app_dir, "Info.txt"), "w", encoding="utf-8") as handle:
+            handle.write("hi\n")
+        os.symlink("Contents", os.path.join(folder, "Demo.app", "Current"))
+        archive = os.path.join(parent, "download.zip")
+        build_desktop.make_zip(folder, archive)
+        self.assertTrue(build_desktop.mac_zip_keeps_shortcuts(archive))
 
 
 def has_text(values, snippet):

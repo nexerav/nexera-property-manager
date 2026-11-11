@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.1
+
+### The Mac download opens
+
+The 1.5.0 Mac download could show "is damaged and can't be opened." The app was not damaged. The zip had replaced shortcuts inside the app with copies, and macOS refused to open it.
+
+Download 1.5.1 from the releases page. Unzip it, then right-click **Nexera Property Manager** and choose **Open**, then **Open** again. The sign-in page shows 1.5.1. The books in Documents stay where they are. You do not need a terminal.
+
 ## 1.5.0
 
 ### Install on your own computer

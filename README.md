@@ -24,7 +24,7 @@ Download the latest version. There is no terminal and no settings file.
 The version number is on the [releases page](https://github.com/nexerav/nexera-property-manager/releases) and on the sign-in screen. What changed is in [CHANGELOG.md](CHANGELOG.md) and on that same releases page.
 
 1. Unzip the download.
-2. On a Mac, the first time, right-click **Nexera Property Manager** and choose **Open**, then **Open**. On Windows, double-click **Nexera Property Manager**. If Windows says it protected your PC, choose **More info**, then **Run anyway**.
+2. On a Mac, the first time, right-click **Nexera Property Manager** and choose **Open**, then **Open**. On Windows, double-click **Nexera Property Manager**. If Windows says it protected your PC, choose **More info**, then **Run anyway**. If a Mac says the app is damaged, download it again from the releases page. That message came from an early Mac zip. The current download replaces it.
 3. Your browser opens. Choose a password. The username is `admin`.
 4. Your books are saved in **Documents / Nexera Property Manager**. Copy that folder when you want a backup.
 

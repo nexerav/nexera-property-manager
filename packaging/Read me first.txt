@@ -1,6 +1,7 @@
 Nexera Property Manager
 
 1. Mac: right-click "Nexera Property Manager" and choose Open. Click Open again.
+   If Mac says the app is damaged, download the latest version again from the same page.
    Windows: double-click "Nexera Property Manager". If Windows says it protected your PC, click More info, then Run anyway.
 
 2. Your browser opens. Choose a password. Your username is admin.
