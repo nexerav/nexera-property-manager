@@ -12,11 +12,11 @@ import json
 import logging
 import os
 import secrets
-import socket
 import subprocess
 import sys
 import threading
 import time
+import traceback
 import urllib.error
 import urllib.request
 import webbrowser
@@ -26,8 +26,19 @@ APP_FOLDER_NAME = "Nexera Property Manager"
 HEALTH_TIMEOUT_SECONDS = 30
 
 
+def headless():
+    """True when nobody is sitting in front of a window, such as a test run."""
+    if os.environ.get("NEXERA_NO_BROWSER") == "1":
+        return True
+    return os.environ.get("CI", "").strip().lower() in {"1", "true", "yes"}
+
+
 def tell_user(message):
     """Show a short message without a terminal window."""
+    logging.error("%s", message)
+    if headless():
+        sys.stderr.write(message + "\n")
+        return
     try:
         if sys.platform == "darwin":
             safe = message.replace("\\", "\\\\").replace('"', '\\"')
@@ -36,7 +47,7 @@ def tell_user(message):
                     "osascript",
                     "-e",
                     'display dialog "%s" buttons {"OK"} default button 1 '
-                    'with title "Nexera Property Manager"' % safe,
+                    'with title "Nexera Property Manager" giving up after 20' % safe,
                 ],
                 check=False,
             )
@@ -175,13 +186,10 @@ def wait_for_url(folder, timeout):
     return None
 
 
-def pick_port():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        sock.bind(("127.0.0.1", 0))
-        return sock.getsockname()[1]
-    finally:
-        sock.close()
+def note(folder, text):
+    path = os.path.join(folder, "startup.txt")
+    with open(path, "a", encoding="utf-8") as handle:
+        handle.write(text + "\n")
 
 
 def write_port(folder, port):
@@ -200,6 +208,9 @@ def prepare_environment(folder):
     os.environ.pop("APP_PASSWORD", None)
     os.environ.pop("FLASK_DEBUG", None)
     os.environ.pop("DEMO_MODE", None)
+    # A copied environment must not make Werkzeug treat this as its reloader.
+    os.environ.pop("WERKZEUG_RUN_MAIN", None)
+    os.environ.pop("WERKZEUG_SERVER_FD", None)
 
 
 def open_page(url):
@@ -220,21 +231,33 @@ def open_browser_when_ready(folder, base_url):
     )
 
 
-def serve(port):
+def serve(folder):
+    """Listen on this computer and record the port after the socket is bound."""
     # Imported after the environment is set, so the secret and data folder stick.
     import app as application
-    application.app.run(
-        host="127.0.0.1",
-        port=port,
-        debug=False,
-        use_reloader=False,
-        threaded=True,
+    from werkzeug.serving import make_server
+
+    note(folder, "import-ok")
+    server = make_server("127.0.0.1", 0, application.app, threaded=True)
+    server.daemon_threads = True
+    port = server.socket.getsockname()[1]
+    write_port(folder, port)
+    base_url = "http://127.0.0.1:%s/" % port
+    note(folder, "listening %s" % port)
+    logging.info("Opening %s", base_url)
+    opener = threading.Thread(
+        target=open_browser_when_ready,
+        args=(folder, base_url),
+        daemon=True,
     )
+    opener.start()
+    server.serve_forever()
 
 
 def run():
     folder = choose_data_dir()
     os.makedirs(folder, mode=0o700, exist_ok=True)
+    note(folder, "start")
     logging.basicConfig(
         filename=os.path.join(folder, "nexera.log"),
         level=logging.INFO,
@@ -256,17 +279,8 @@ def run():
         return
     try:
         prepare_environment(folder)
-        port = pick_port()
-        write_port(folder, port)
-        base_url = "http://127.0.0.1:%s/" % port
-        logging.info("Opening %s", base_url)
-        opener = threading.Thread(
-            target=open_browser_when_ready,
-            args=(folder, base_url),
-            daemon=True,
-        )
-        opener.start()
-        serve(port)
+        note(folder, "env-ready")
+        serve(folder)
     finally:
         release_lock(folder)
 
@@ -276,6 +290,7 @@ def main():
         run()
     except Exception:
         logging.exception("Nexera stopped")
+        sys.stderr.write(traceback.format_exc())
         tell_user(
             "Nexera could not start. The details are in nexera.log inside the "
             "Nexera Property Manager folder in Documents."

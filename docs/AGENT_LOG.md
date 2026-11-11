@@ -10,4 +10,4 @@ Files: desktop.py, app.py, auth.py, version.py, templates/setup.html, templates/
 
 Verification: `python3 -m unittest tests.test_app -v` passed, including a live desktop process that served the password page on 127.0.0.1.
 
-Open items: The release zips are produced when the v1.5.0 tag is pushed. Mac and Windows will warn on first open until the downloads are signed with a paid developer certificate.
+Open items: The release zips are produced when the v1.5.0 tag is pushed. Mac and Windows will warn on first open until the downloads are signed with a paid developer certificate. The first tag build failed in the desktop startup test; the server now binds before it records the port, and a headless run no longer waits on a dialog.
