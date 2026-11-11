@@ -321,6 +321,35 @@ def request_reset(data, username, expected_username, now, build_link):
     return GENERIC_RESET_MESSAGE
 
 
+def stdin_is_console():
+    """True when a person can type a reply.
+
+    On Windows the NUL device reports itself as a terminal. Trusting that
+    makes a redirected reset wait forever for a key that nobody will press.
+    """
+    try:
+        fd = sys.stdin.fileno()
+    except (AttributeError, ValueError, OSError):
+        return False
+    if os.name != "nt":
+        try:
+            return os.isatty(fd)
+        except OSError:
+            return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+        import msvcrt
+        handle = msvcrt.get_osfhandle(fd)
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.GetConsoleMode.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+        kernel32.GetConsoleMode.restype = wintypes.BOOL
+        mode = wintypes.DWORD()
+        return bool(kernel32.GetConsoleMode(wintypes.HANDLE(handle), ctypes.byref(mode)))
+    except (OSError, ValueError, OverflowError, TypeError):
+        return False
+
+
 def read_new_password():
     """Read a new password from the environment or an interactive prompt.
 
@@ -332,7 +361,7 @@ def read_new_password():
         if not supplied:
             raise ResetError("APP_PASSWORD_RESET is empty.")
         return supplied
-    if not sys.stdin.isatty():
+    if not stdin_is_console():
         raise ResetError(
             "Set APP_PASSWORD_RESET for a non-interactive reset, or run this "
             "command in a terminal so it can ask for the password."

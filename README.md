@@ -63,6 +63,8 @@ docker compose exec -it property-manager python app.py reset-password
 
 The new password is stored as a hash in `data/rental_data.json` and is what signs in after that, including after a restart. `APP_PASSWORD` in `.env` is only the bootstrap password until the first reset.
 
+A script can set `APP_PASSWORD_RESET` for that one run instead of typing at the prompt. The password is still not accepted as a command argument. On Windows this is also what to use when the command is not attached to a console window.
+
 While you are signed in, Settings has the same change. It asks for the current password, then clears a lockout.
 
 If you set `SMTP_HOST`, `SMTP_FROM`, and `PASSWORD_RESET_EMAIL`, the sign-in page can email you a link. The link works once and expires after 30 minutes. Without those settings, no reset email is sent.

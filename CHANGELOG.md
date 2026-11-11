@@ -13,6 +13,7 @@ A landlord can download Nexera and open it. This path has no terminal, no Git, a
 - The downloaded app listens only on that computer. It does not phone home.
 - Quit Nexera from the sign-in page before opening a newly downloaded copy. The books stay in the same folder.
 - Docker and any other server install are unchanged. Those still need `SECRET_KEY` and `APP_PASSWORD`, and they do not show the first-run password page.
+- On Windows, `python app.py reset-password` stops and tells you what to do when it is not running in a console window. Set `APP_PASSWORD_RESET` for a script. The password is still not accepted as a command argument.
 
 The first time you open the download, Mac and Windows may ask you to confirm because the file is not from their store. Right-click and choose Open on a Mac. On Windows, choose More info, then Run anyway.
 
