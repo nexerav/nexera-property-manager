@@ -232,15 +232,29 @@ def open_browser_when_ready(folder, base_url):
 
 
 def serve(folder):
-    """Listen on this computer and record the port after the socket is bound."""
+    """Listen on this computer and record the port after the socket is bound.
+
+    The socket is bound with an address tuple. Looking the name up first can
+    stall for a long time on some Macs, including GitHub's runners.
+    """
+    import socketserver
+    from wsgiref.simple_server import WSGIRequestHandler, WSGIServer
+
     # Imported after the environment is set, so the secret and data folder stick.
     import app as application
-    from werkzeug.serving import make_server
+
+    class QuietHandler(WSGIRequestHandler):
+        def log_message(self, fmt, *args):
+            return
+
+    class ThreadedServer(socketserver.ThreadingMixIn, WSGIServer):
+        daemon_threads = True
+        allow_reuse_address = True
 
     note(folder, "import-ok")
-    server = make_server("127.0.0.1", 0, application.app, threaded=True)
-    server.daemon_threads = True
-    port = server.socket.getsockname()[1]
+    server = ThreadedServer(("127.0.0.1", 0), QuietHandler)
+    server.set_app(application.app)
+    port = server.server_address[1]
     write_port(folder, port)
     base_url = "http://127.0.0.1:%s/" % port
     note(folder, "listening %s" % port)
