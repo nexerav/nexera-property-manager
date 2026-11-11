@@ -12,7 +12,7 @@ INSTALL = """\
 
 Download the file for your computer from this release. You do not need a terminal.
 
-- **Mac:** unzip the download, then right-click **Nexera Property Manager** and choose **Open**. Click **Open** again.
+- **Mac:** unzip the download and double-click **Nexera Property Manager**. When Mac says Apple could not verify the app, click **Done**. Do not click **Move to Bin**. Open the Apple menu, choose **System Settings**, then **Privacy & Security**. Scroll to **Security** and click **Open Anyway**. On an older Mac, right-click the app and choose **Open**, then **Open**.
 - **Windows:** unzip the download and double-click **Nexera Property Manager**. If Windows says it protected your PC, click **More info**, then **Run anyway**.
 
 Your browser opens. Choose a password. The username is `admin`. Your books are saved in Documents, in the folder **Nexera Property Manager**. Copy that folder when you want a backup.

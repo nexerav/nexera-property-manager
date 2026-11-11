@@ -12,4 +12,4 @@ Verification: `python3 -m unittest tests.test_app -v` passed, including a live d
 
 Open items: Mac and Windows will warn on first open until the downloads are signed with a paid developer certificate. The desktop server binds on 127.0.0.1 without a DNS lookup, and a headless run does not wait on a dialog. On Windows, a password reset with no console exits instead of waiting for a key.
 
-Version 1.5.1 zips the Mac app with ditto so the shortcuts inside the app survive. The 1.5.0 Mac zip stored copies instead, and macOS called the app damaged.
+Version 1.5.1 zips the Mac app with ditto so the shortcuts inside the app survive. The 1.5.0 Mac zip stored copies instead, and macOS called the app damaged. On current macOS the first open is System Settings, Privacy & Security, Open Anyway. Right-click Open remains the path on older Macs.
