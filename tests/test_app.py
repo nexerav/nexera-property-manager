@@ -7,6 +7,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 import urllib.error
@@ -1273,13 +1274,20 @@ print("demo-ok")
             stderr=subprocess.PIPE,
             text=True,
         )
+        stderr_parts = []
+
+        def drain_stderr():
+            if proc.stderr is not None:
+                stderr_parts.append(proc.stderr.read())
+
+        threading.Thread(target=drain_stderr, daemon=True).start()
         try:
             base = None
             deadline = time.time() + 25
             while time.time() < deadline:
                 if proc.poll() is not None:
-                    error = proc.stderr.read()
-                    self.fail("desktop app stopped: " + error)
+                    time.sleep(0.2)
+                    self.fail("desktop app stopped: " + "".join(stderr_parts))
                 port_path = os.path.join(folder, "port")
                 if os.path.exists(port_path):
                     with open(port_path, encoding="utf-8") as handle:
@@ -1294,7 +1302,13 @@ print("demo-ok")
                         base = None
                 time.sleep(0.2)
             else:
-                self.fail("desktop app did not answer")
+                details = ["".join(stderr_parts)]
+                for name in ("startup.txt", "nexera.log", "port"):
+                    path = os.path.join(folder, name)
+                    if os.path.isfile(path):
+                        with open(path, encoding="utf-8") as handle:
+                            details.append(name + ":\n" + handle.read()[:2000])
+                self.fail("desktop app did not answer\n" + "\n".join(details))
             with urllib.request.urlopen(base + "setup", timeout=5) as response:
                 page = response.read()
             self.assertIn(b"Choose a password", page)
