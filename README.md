@@ -14,7 +14,27 @@
 
 Most rental software is built for agencies and charges per unit per month. If you own one to ten units, you usually end up with a spreadsheet, a folder of PDFs and a WhatsApp thread. This is the tool we wanted for that: one login, one data file, proper invoices, PDF and Excel exports, and a clear picture of what each unit earns. It was built for South African landlords (rand, recoveries for water and electricity, body-corporate costs) but works anywhere.
 
-## Quick start (Docker, about 2 minutes)
+## Install on your computer
+
+Download the latest version. There is no terminal and no settings file.
+
+- [Download for Mac](https://github.com/nexerav/nexera-property-manager/releases/latest/download/Nexera-Property-Manager-mac.zip)
+- [Download for Windows](https://github.com/nexerav/nexera-property-manager/releases/latest/download/Nexera-Property-Manager-windows.zip)
+
+The version number is on the [releases page](https://github.com/nexerav/nexera-property-manager/releases) and on the sign-in screen. What changed is in [CHANGELOG.md](CHANGELOG.md) and on that same releases page.
+
+1. Unzip the download.
+2. On a Mac, the first time, right-click **Nexera Property Manager** and choose **Open**, then **Open**. On Windows, double-click **Nexera Property Manager**. If Windows says it protected your PC, choose **More info**, then **Run anyway**.
+3. Your browser opens. Choose a password. The username is `admin`.
+4. Your books are saved in **Documents / Nexera Property Manager**. Copy that folder when you want a backup.
+
+Open the same app the next time. Closing the browser does not delete your books. Forgot the password? Choose **Forgot password?** on the sign-in page and set a new one. That stays on this computer.
+
+To move to a newer download, choose **Quit Nexera** on the sign-in page, then open the new copy. The books stay in the same folder.
+
+## Run it on a server
+
+This path is for someone who already runs Docker. The download above is the install for everyone else.
 
 ```bash
 git clone https://github.com/nexerav/nexera-property-manager.git
@@ -25,7 +45,7 @@ python3 -c "import secrets; print(secrets.token_hex(32))"
 docker compose up -d --build
 ```
 
-Open http://127.0.0.1:5000 and sign in as `admin` (or your `APP_USERNAME`) with the password you set. The app will not start with a missing or placeholder `SECRET_KEY` / `APP_PASSWORD`. Your data lives in `./data/rental_data.json` and survives `docker compose down`.
+Open http://127.0.0.1:5000 and sign in as `admin` (or your `APP_USERNAME`) with the password you set. The app will not start with a missing or placeholder `SECRET_KEY` / `APP_PASSWORD`. Your data lives in `./data/rental_data.json` and survives `docker compose down`. A server install does not show the first-run password page.
 
 ## If you are locked out
 

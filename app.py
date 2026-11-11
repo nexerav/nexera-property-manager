@@ -11,19 +11,27 @@ from functools import wraps
 from datetime import datetime, timedelta
 from io import BytesIO
 from xml.sax.saxutils import escape
+import hmac
 import os
 import json
+import secrets
 import sys
 import threading
 import uuid
-from dotenv import load_dotenv
 
 import auth
 import demo_data
 import exports
 import labels
+import version
 
-load_dotenv()
+# The desktop app sets its own data folder and secret before import. A .env
+# found above that folder must not replace them or invent a password.
+if not auth.env_flag("NEXERA_DESKTOP"):
+    from dotenv import load_dotenv
+    load_dotenv()
+
+VERSION = version.VERSION
 
 # Published placeholders are rejected so a fresh checkout cannot sign in
 # until the operator chooses both values.
@@ -70,10 +78,25 @@ def brand_context():
         "demo_mode": auth.demo_mode(),
         "expense_choices": labels.EXPENSE_CHOICES,
         "category_aliases": labels.LEGACY_CATEGORIES,
+        "version": VERSION,
+        "desktop_mode": auth.env_flag("NEXERA_DESKTOP"),
+        "books_folder": os.path.abspath(os.path.dirname(DATA_FILE) or "."),
     }
 
 
-app = Flask(__name__)
+def bundle_root():
+    """Templates and static files live next to the source, or inside a packaged app."""
+    if getattr(sys, "frozen", False):
+        return sys._MEIPASS
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+_BUNDLE = bundle_root()
+app = Flask(
+    __name__,
+    template_folder=os.path.join(_BUNDLE, "templates"),
+    static_folder=os.path.join(_BUNDLE, "static"),
+)
 app.jinja_env.filters["zar"] = labels.format_zar
 app.jinja_env.filters["qty"] = labels.format_qty
 app.secret_key = require_setting("SECRET_KEY", os.environ.get("SECRET_KEY"), INSECURE_SECRET_KEYS)
@@ -83,7 +106,21 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 DATA_FILE = os.environ.get("DATA_FILE", os.path.join("data", "rental_data.json"))
 
 VALID_USERNAME = (os.environ.get("APP_USERNAME") or "admin").strip() or "admin"
-VALID_PASSWORD = require_setting("APP_PASSWORD", os.environ.get("APP_PASSWORD"), INSECURE_PASSWORDS)
+
+
+def configured_password():
+    """Bootstrap password from the environment.
+
+    A desktop install has none until the first page stores a hash. A server
+    install still refuses to start without its own APP_PASSWORD.
+    """
+    raw = os.environ.get("APP_PASSWORD")
+    if auth.env_flag("NEXERA_DESKTOP") and not (raw or "").strip():
+        return None
+    return require_setting("APP_PASSWORD", raw, INSECURE_PASSWORDS)
+
+
+VALID_PASSWORD = configured_password()
 
 PREMIUM_DESCRIPTION = (
     "Premium adds instant invoicing, invoices emailed straight from the platform, "
@@ -602,24 +639,95 @@ def filtered_rows(rows, start, end, property_id):
 @app.route("/favicon.ico")
 def favicon():
     return send_file(
-        os.path.join(app.root_path, "static", "favicon.ico"),
+        os.path.join(app.static_folder, "favicon.ico"),
         mimetype="image/x-icon",
     )
 
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok", "version": "oss-1.1"})
+    return jsonify({"status": "ok", "version": VERSION})
+
+
+# Set once a desktop install has a password hash, so later requests skip a
+# read of the books. Tests clear it. A server install never uses it.
+_desktop_ready = False
+
+
+def needs_setup():
+    """True only for a desktop install that has no password yet."""
+    global _desktop_ready
+    if not auth.env_flag("NEXERA_DESKTOP") or VALID_PASSWORD:
+        return False
+    if _desktop_ready:
+        return False
+    try:
+        data = load_data()
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return True
+    record = data.get("auth") if isinstance(data.get("auth"), dict) else {}
+    if record.get("password_hash") and record.get("password_salt"):
+        _desktop_ready = True
+        return False
+    return True
+
+
+def local_request():
+    return (request.remote_addr or "") in {"127.0.0.1", "::1"}
+
+
+def issue_form_token():
+    token = secrets.token_urlsafe(32)
+    session["form_token"] = token
+    return token
+
+
+def form_token_ok():
+    expected = session.get("form_token")
+    supplied = request.form.get("form_token")
+    if not isinstance(expected, str) or not isinstance(supplied, str):
+        return False
+    if not expected or len(expected) != len(supplied):
+        return False
+    return hmac.compare_digest(expected, supplied)
+
+
+def same_origin_post():
+    origin = (request.headers.get("Origin") or "").rstrip("/")
+    if not origin:
+        return True
+    return origin == request.host_url.rstrip("/")
+
+
+def desktop_reset_allowed():
+    return auth.env_flag("NEXERA_DESKTOP") and not auth.demo_mode() and local_request()
+
+
+_OPEN_WHILE_SETUP = {"setup", "health", "favicon", "static", "quit"}
+
+
+@app.before_request
+def open_on_setup():
+    if request.endpoint in _OPEN_WHILE_SETUP:
+        return None
+    if needs_setup():
+        return redirect(url_for("setup"))
+    return None
 
 
 def login_page(error=None):
     brand = page_brand()
+    desktop = auth.env_flag("NEXERA_DESKTOP")
     return render_template(
         "login.html",
         error=error,
         logo=brand["logo"],
         organisation_name=brand["organisation_name"],
-        show_reset=not auth.web_reset_blocked(VALID_USERNAME),
+        show_reset=not desktop and not auth.web_reset_blocked(VALID_USERNAME),
+        desktop_reset=desktop and not auth.demo_mode(),
+        desktop_mode=desktop,
+        username=VALID_USERNAME,
+        version=VERSION,
     )
 
 
@@ -666,6 +774,126 @@ def login():
     if session.get("logged_in"):
         return redirect(url_for("dashboard"))
     return login_page()
+
+
+def stop_process():
+    """Leave the desktop app. Tests replace this so the suite is not killed."""
+    os._exit(0)
+
+
+QUIT_DELAY_SECONDS = 0.4
+
+
+def close_desktop():
+    timer = threading.Timer(QUIT_DELAY_SECONDS, stop_process)
+    timer.daemon = True
+    timer.start()
+
+
+def password_form_error(password, confirm):
+    if password != confirm:
+        return "Those passwords do not match."
+    return auth.password_problem(password, INSECURE_PASSWORDS)
+
+
+@app.route("/setup", methods=["GET", "POST"])
+def setup():
+    """First page of a desktop install. Asks for a password and then signs in."""
+    if not auth.env_flag("NEXERA_DESKTOP") or not local_request():
+        return "Not found", 404
+    if not needs_setup():
+        return redirect(url_for("login"))
+    error = None
+    if request.method == "POST":
+        if not same_origin_post() or not form_token_ok():
+            error = "This page expired. Open it again."
+        else:
+            password = request.form.get("password", "")
+            confirm = request.form.get("confirm", "")
+            error = password_form_error(password, confirm)
+            if error is None:
+                if not _data_lock.acquire(timeout=8):
+                    error = "The data file is busy. Wait a moment and try again."
+                else:
+                    try:
+                        data = load_data()
+                        error = auth.apply_new_password(data, password, INSECURE_PASSWORDS)
+                        if error is None:
+                            save_data(data)
+                            session.clear()
+                            session["logged_in"] = True
+                            session["username"] = VALID_USERNAME
+                            return redirect(url_for("dashboard"))
+                    finally:
+                        _data_lock.release()
+    return render_template(
+        "setup.html",
+        error=error,
+        form_token=issue_form_token(),
+        username=VALID_USERNAME,
+        version=VERSION,
+        password_rule=auth.PASSWORD_RULE,
+    )
+
+
+@app.route("/desktop-reset", methods=["GET", "POST"])
+def desktop_reset():
+    """Set a new password from this computer, with no terminal command."""
+    if not desktop_reset_allowed():
+        return "Not found", 404
+    if needs_setup():
+        return redirect(url_for("setup"))
+    error = None
+    if request.method == "POST":
+        if not same_origin_post() or not form_token_ok():
+            error = "This page expired. Open it again."
+        else:
+            password = request.form.get("password", "")
+            confirm = request.form.get("confirm", "")
+            error = password_form_error(password, confirm)
+            if error is None:
+                if not _data_lock.acquire(timeout=8):
+                    error = "The data file is busy. Wait a moment and try again."
+                else:
+                    try:
+                        data = load_data()
+                        error = auth.apply_new_password(data, password, INSECURE_PASSWORDS)
+                        if error is None:
+                            save_data(data)
+                            session.clear()
+                            session["logged_in"] = True
+                            session["username"] = VALID_USERNAME
+                            return redirect(url_for("dashboard"))
+                    finally:
+                        _data_lock.release()
+    return render_template(
+        "desktop_reset.html",
+        error=error,
+        form_token=issue_form_token(),
+        username=VALID_USERNAME,
+        version=VERSION,
+    )
+
+
+@app.route("/quit", methods=["GET", "POST"])
+def quit():
+    """Close the desktop app. The books stay in the Documents folder."""
+    if not auth.env_flag("NEXERA_DESKTOP") or not local_request():
+        return "Not found", 404
+    error = None
+    if request.method == "POST":
+        if not same_origin_post() or not form_token_ok():
+            error = "This page expired. Open it again."
+        else:
+            close_desktop()
+            return render_template("quit.html", closed=True, version=VERSION, error=None, form_token="")
+    return render_template(
+        "quit.html",
+        closed=False,
+        error=error,
+        form_token=issue_form_token(),
+        version=VERSION,
+    )
 
 
 @app.route("/forgot-password", methods=["GET", "POST"])

@@ -129,6 +129,10 @@ def password_is_current(password, auth, env_password):
         return False
     if auth.get("password_hash") and auth.get("password_salt"):
         return verify_password(password, auth["password_salt"], auth["password_hash"])
+    # Desktop installs have no bootstrap password until the first-run page
+    # stores a hash. None must not compare equal to an empty form field.
+    if not isinstance(env_password, str):
+        return False
     return same_secret(password, env_password)
 
 
