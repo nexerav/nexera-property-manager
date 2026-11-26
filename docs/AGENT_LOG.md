@@ -1,5 +1,15 @@
 # Agent log
 
+## 2026-11-26
+
+What changed: Recorded where this app is edited and where the demo, website, and waitlist run. Added `AGENTS.md` and `progress.md`.
+
+Why: The next coding session needs one workbench directory, and the live folders are not that directory.
+
+Files: AGENTS.md, progress.md, docs/AGENT_LOG.md.
+
+Verification: The workbench clone is `~/work/nexera-property-manager` on the Cloud VM. No live directory was edited.
+
 ## 2026-11-11
 
 What changed: Version 1.5.0 adds a double-click Mac and Windows app. The first page asks for a password, the app creates its own secret key, and the books stay in Documents/Nexera Property Manager. Server installs still require SECRET_KEY and APP_PASSWORD. GitHub release workflow builds the zips and publishes the changelog.
