@@ -1,5 +1,15 @@
 # Agent log
 
+## 2026-11-26 later
+
+What changed: The workbench is the home server `nexerav`, not the rented server. GitHub remains the sync. The rented server `156.155.253.123` is being cancelled.
+
+Why: The owner is cancelling the Cloud VM. That name means the rented machine, not the computer at the house.
+
+Files: AGENTS.md, progress.md, docs/AGENT_LOG.md.
+
+Verification: Docs only. `nexerav` still has no GitHub SSH key, so the clone was not moved in this change.
+
 ## 2026-11-26
 
 What changed: Recorded where this app is edited and where the demo, website, and waitlist run. Added `AGENTS.md` and `progress.md`.
